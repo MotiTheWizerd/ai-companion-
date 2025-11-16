@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Extension",
+  "version": "1.0.1",
+  "description": "ChatGPT message interceptor and exporter",
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "src/background/background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "http://localhost:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["src/content/loader.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/content.js",
+        "src/content/core/*.js",
+        "src/content/modules/*.js",
+        "src/content/modules/eventHandlers/*.js",
+        "src/content/modules/utils/*.js",
+        "src/modules/*.js",
+        "src/modules/*/*.js"
+      ],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ]
+}

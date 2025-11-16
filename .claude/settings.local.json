@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(move srccontent.js srccontent )",
+      "Bash(move:*)",
+      "Bash(dir:*)",
+      "Bash(tree:*)",
+      "Bash(npm run build:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

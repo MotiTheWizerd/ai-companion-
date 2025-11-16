@@ -1,0 +1,22 @@
+<svg width="35" height="35" viewBox="0 0 35 35" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Logo -->
+                            <g transform="scale(0.4) translate(0,0)">
+                                <defs>
+                                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#ff0080;stop-opacity:1"></stop>
+                                        <stop offset="50%" style="stop-color:#00ff88;stop-opacity:1"></stop>
+                                        <stop offset="100%" style="stop-color:#0080ff;stop-opacity:1"></stop>
+                                    </linearGradient>
+                                </defs>
+                                <rect x="15" y="15" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.9"></rect>
+                                <rect x="40" y="15" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.7"></rect>
+                                <rect x="65" y="15" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.5"></rect>
+                                <rect x="15" y="40" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.5"></rect>
+                                <rect x="40" y="40" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="1"></rect>
+                                <rect x="65" y="40" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.5"></rect>
+                                <rect x="15" y="65" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.5"></rect>
+                                <rect x="40" y="65" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.7"></rect>
+                                <rect x="65" y="65" width="20" height="20" rx="3" fill="url(#logoGrad)" opacity="0.9"></rect>
+                            </g>
+                           
+                        </svg>
