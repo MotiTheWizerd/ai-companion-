@@ -56,24 +56,56 @@ export function handleStreamComplete(data, managers) {
   const message = messageManager.finalize();
   conversationManager.addAssistantMessage(message.message_id, message.text);
 
-  const conversation = conversationManager.getConversation();
+  const fullConversation = conversationManager.getConversation();
 
   // Log final conversation structure
-  Logger.conversation(conversation);
+  Logger.conversation(fullConversation);
 
-  // Auto-save to storage
-  storageManager.saveConversation(conversation);
+  // Auto-save to storage (save full conversation history)
+  storageManager.saveConversation(fullConversation);
+
+  // Extract only the latest user + assistant message pair for backend sync
+  const messages = fullConversation.conversation || [];
+
+  // Find last user message and last assistant message
+  let lastUserMessage = null;
+  let lastAssistantMessage = null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role === 'assistant' && !lastAssistantMessage) {
+      lastAssistantMessage = msg;
+    } else if (msg.role === 'user' && !lastUserMessage) {
+      lastUserMessage = msg;
+    }
+
+    // Stop once we have both
+    if (lastUserMessage && lastAssistantMessage) break;
+  }
+
+  // Only send if we have both user and assistant messages
+  if (!lastUserMessage || !lastAssistantMessage) {
+    Logger.api('Skipping sync: missing user or assistant message');
+    return;
+  }
+
+  // Create payload with only the latest exchange
+  const syncPayload = {
+    conversation_id: fullConversation.conversation_id,
+    model: fullConversation.model,
+    conversation: [lastUserMessage, lastAssistantMessage]
+  };
 
   // Send conversation to background script for API sync
   // Uses window.postMessage to communicate with content script (loader.js)
   // which forwards to background service worker
-  Logger.api('Sending conversation to background for sync');
+  Logger.api('Sending latest exchange to background for sync');
 
   // Post message to content script (message bridge)
   window.postMessage({
     source: 'chatgpt-extension',
     type: 'SYNC_CONVERSATION',
-    data: conversation
+    data: syncPayload
   }, '*');
 
   // Listen for response from background (via content script)
