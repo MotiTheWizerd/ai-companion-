@@ -1,7 +1,10 @@
+import { BaseStreamParser } from '../base/BaseStreamParser.js';
+
 /**
- * Parses ChatGPT streaming response format
+ * ChatGPT-specific stream parser
+ * Parses ChatGPT's SSE format with JSON patch operations
  */
-export class StreamParser {
+export class ChatGPTStreamParser extends BaseStreamParser {
   parseChunk(line) {
     if (!line.startsWith('data: ')) return null;
 
@@ -13,7 +16,7 @@ export class StreamParser {
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.warn('[StreamParser] Failed to parse:', data);
+      console.warn('[ChatGPTStreamParser] Failed to parse:', data);
       return null;
     }
   }

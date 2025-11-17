@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Extension",
-  "version": "1.0.1",
-  "description": "ChatGPT message interceptor and exporter",
+  "name": "AI Conversation Bridge",
+  "version": "2.0.0",
+  "description": "Multi-provider AI conversation interceptor (ChatGPT, Claude, Gemini) and backend sync",
   "action": {
     "default_popup": "src/popup/index.html"
   },
@@ -16,11 +16,17 @@
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
     "http://localhost:8000/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ],
       "js": ["src/content/loader.js"],
       "run_at": "document_start"
     }
@@ -34,9 +40,14 @@
         "src/content/modules/eventHandlers/*.js",
         "src/content/modules/utils/*.js",
         "src/modules/*.js",
-        "src/modules/*/*.js"
+        "src/modules/*/*.js",
+        "src/modules/providers/**/*.js"
       ],
-      "matches": ["https://chatgpt.com/*"]
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*"
+      ]
     }
   ]
 }

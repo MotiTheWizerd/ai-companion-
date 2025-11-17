@@ -1,3 +1,5 @@
+import { ProviderRegistry } from '../providers/ProviderRegistry.js';
+
 /**
  * FetchHandler - Handles fetch interception and stream processing
  */
@@ -5,6 +7,7 @@ export class FetchHandler {
   constructor(chunkProcessor) {
     this.chunkProcessor = chunkProcessor;
     this.originalFetch = window.fetch;
+    this.providerRegistry = ProviderRegistry.getInstance();
   }
 
   /**
@@ -19,9 +22,10 @@ export class FetchHandler {
       // Call original fetch
       const response = await self.originalFetch.apply(this, args);
 
-      // Only intercept conversation endpoint
-      if (typeof url === 'string' && url.includes('/conversation')) {
-        return self.handleConversationStream(response);
+      // Check if ANY provider matches this URL
+      const activeProvider = self.providerRegistry.getActiveProvider();
+      if (activeProvider && activeProvider.getURLMatcher().isConversationEndpoint(url)) {
+        return self.handleConversationStream(response, activeProvider);
       }
 
       return response;
@@ -31,7 +35,7 @@ export class FetchHandler {
   /**
    * Handle conversation stream response
    */
-  async handleConversationStream(response) {
+  async handleConversationStream(response, provider) {
     const originalBody = response.body;
     if (!originalBody) return response;
 
@@ -52,7 +56,8 @@ export class FetchHandler {
 
             // Decode and process the chunk
             const chunk = decoder.decode(value, { stream: true });
-            this.chunkProcessor.processChunk(chunk);
+            // Pass provider to chunk processor
+            this.chunkProcessor.processChunk(chunk, provider);
 
             // Pass through to original consumer
             controller.enqueue(value);

@@ -10,13 +10,18 @@ import { MessageManager } from '../../modules/MessageManager/index.js';
 import { StorageManager } from '../../modules/StorageManager/index.js';
 import { exposeAPI } from '../modules/publicAPI.js';
 import { HANDLER_REGISTRY } from '../modules/eventHandlers/registry.js';
+import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
+import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
 
 /**
  * Application class
- * Central orchestrator for the ChatGPT Extension
+ * Central orchestrator for the AI Conversation Bridge Extension
  */
 export class Application {
   constructor() {
+    // Initialize provider registry first
+    this.initializeProviders();
+
     // Initialize core modules
     this.interceptor = new NetworkInterceptor();
     this.conversationManager = new ConversationManager();
@@ -33,6 +38,28 @@ export class Application {
       messageManager: this.messageManager,
       storageManager: this.storageManager,
     };
+  }
+
+  /**
+   * Initialize provider registry and register all providers
+   */
+  initializeProviders() {
+    const registry = ProviderRegistry.getInstance();
+
+    // Register ChatGPT provider
+    registry.register(new ChatGPTProvider());
+
+    // Future: Register other providers
+    // registry.register(new ClaudeProvider());
+    // registry.register(new GeminiProvider());
+
+    // Detect active provider
+    const activeProvider = registry.detectActiveProvider();
+    if (activeProvider) {
+      Logger.extension(`Active AI provider: ${activeProvider.getName()}`);
+    } else {
+      Logger.extension('No AI provider detected for current page');
+    }
   }
 
   /**
