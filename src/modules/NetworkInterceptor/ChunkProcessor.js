@@ -10,6 +10,24 @@ export class ChunkProcessor {
   }
 
   /**
+   * Process user message extracted from request body
+   * Emits message:input event manually
+   */
+  processUserMessage(userPrompt, conversationId, provider = null) {
+    if (!userPrompt) return;
+
+    console.log('[ChunkProcessor] Processing user message:', userPrompt);
+
+    // Emit message:input event with user prompt
+    eventBus.emit('message:input', {
+      type: 'input_message',
+      conversationId: conversationId,
+      text: userPrompt,
+      role: 'user'
+    });
+  }
+
+  /**
    * Process a chunk of stream data
    */
   processChunk(chunk, provider = null) {

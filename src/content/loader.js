@@ -4,6 +4,8 @@
  * 2. Bridges messages between page context and background service worker
  */
 
+console.log('[Loader] Content script starting on:', window.location.href);
+
 // Inject main application script into page context
 (function() {
   const script = document.createElement('script');

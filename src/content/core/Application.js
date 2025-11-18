@@ -12,6 +12,7 @@ import { exposeAPI } from '../modules/publicAPI.js';
 import { HANDLER_REGISTRY } from '../modules/eventHandlers/registry.js';
 import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
 import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
+import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
 
 /**
  * Application class
@@ -49,8 +50,10 @@ export class Application {
     // Register ChatGPT provider
     registry.register(new ChatGPTProvider());
 
+    // Register Claude provider
+    registry.register(new ClaudeProvider());
+
     // Future: Register other providers
-    // registry.register(new ClaudeProvider());
     // registry.register(new GeminiProvider());
 
     // Detect active provider

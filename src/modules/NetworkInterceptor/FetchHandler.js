@@ -17,15 +17,40 @@ export class FetchHandler {
     const self = this;
 
     window.fetch = async function(...args) {
-      const [url] = args;
+      const [url, options] = args;
+
+      // Check if ANY provider matches this URL
+      const activeProvider = self.providerRegistry.getActiveProvider();
+      const isConversationEndpoint = activeProvider && activeProvider.getURLMatcher().isConversationEndpoint(url);
+
+      // Extract user prompt and conversation ID from request
+      let userPrompt = null;
+      let conversationId = null;
+
+      if (isConversationEndpoint) {
+        // Extract conversation ID from URL
+        // Format: /chat_conversations/{uuid}/completion
+        const conversationMatch = url.match(/chat_conversations\/([^\/]+)/);
+        if (conversationMatch) {
+          conversationId = conversationMatch[1];
+        }
+
+        // Extract user prompt from request body
+        if (options?.body) {
+          try {
+            const requestBody = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+            userPrompt = requestBody.prompt || null;
+          } catch (error) {
+            console.warn('[FetchHandler] Failed to parse request body:', error);
+          }
+        }
+      }
 
       // Call original fetch
       const response = await self.originalFetch.apply(this, args);
 
-      // Check if ANY provider matches this URL
-      const activeProvider = self.providerRegistry.getActiveProvider();
-      if (activeProvider && activeProvider.getURLMatcher().isConversationEndpoint(url)) {
-        return self.handleConversationStream(response, activeProvider);
+      if (isConversationEndpoint) {
+        return self.handleConversationStream(response, activeProvider, userPrompt, conversationId);
       }
 
       return response;
@@ -35,12 +60,17 @@ export class FetchHandler {
   /**
    * Handle conversation stream response
    */
-  async handleConversationStream(response, provider) {
+  async handleConversationStream(response, provider, userPrompt, conversationId) {
     const originalBody = response.body;
     if (!originalBody) return response;
 
     const reader = originalBody.getReader();
     const decoder = new TextDecoder();
+
+    // Emit user message before processing stream (if we have it)
+    if (userPrompt) {
+      this.chunkProcessor.processUserMessage(userPrompt, conversationId, provider);
+    }
 
     // Create a new readable stream that we can tap into
     const stream = new ReadableStream({

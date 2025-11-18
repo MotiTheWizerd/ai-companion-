@@ -18,11 +18,12 @@
   },
   "permissions": [],
   "host_permissions": [
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://claude.ai/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
+      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"],
       "js": ["src/loader.js"],
       "run_at": "document_start"
     }
@@ -36,9 +37,10 @@
         "src/content/modules/eventHandlers/*.js",
         "src/content/modules/utils/*.js",
         "src/modules/*.js",
-        "src/modules/*/*.js"
+        "src/modules/*/*.js",
+        "src/modules/providers/*/*.js"
       ],
-      "matches": ["https://chatgpt.com/*"]
+      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"]
     }
   ]
 }
