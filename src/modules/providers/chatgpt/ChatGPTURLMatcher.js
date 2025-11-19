@@ -9,6 +9,9 @@ export class ChatGPTURLMatcher extends BaseURLMatcher {
   }
 
   isConversationEndpoint(url) {
-    return typeof url === 'string' && url.includes('/conversation');
+    return typeof url === 'string' && (
+      url.includes('/backend-api/conversation') ||
+      url.includes('/backend-api/f/conversation')
+    );
   }
 }

@@ -16,7 +16,7 @@ export class FetchHandler {
   interceptFetch() {
     const self = this;
 
-    window.fetch = async function(...args) {
+    window.fetch = async function (...args) {
       const [url, options] = args;
 
       // Check if ANY provider matches this URL
@@ -35,13 +35,33 @@ export class FetchHandler {
           conversationId = conversationMatch[1];
         }
 
-        // Extract user prompt from request body
+        // Extract and modify user prompt from request body
         if (options?.body) {
           try {
-            const requestBody = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
-            userPrompt = requestBody.prompt || null;
+            let requestBody = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+
+            // Allow provider to modify the request body
+            if (activeProvider && typeof activeProvider.handleRequest === 'function') {
+              requestBody = activeProvider.handleRequest(requestBody);
+
+              // Update the request body in options
+              // We need to re-stringify if it was a string originally
+              if (typeof options.body === 'string') {
+                options.body = JSON.stringify(requestBody);
+              } else {
+                options.body = requestBody;
+              }
+            }
+
+            // Extract prompt for local processing (after modification)
+            if (activeProvider && typeof activeProvider.extractPrompt === 'function') {
+              userPrompt = activeProvider.extractPrompt(requestBody);
+            } else {
+              userPrompt = requestBody.prompt || null;
+            }
+
           } catch (error) {
-            console.warn('[FetchHandler] Failed to parse request body:', error);
+            console.warn('[FetchHandler] Failed to parse/modify request body:', error);
           }
         }
       }

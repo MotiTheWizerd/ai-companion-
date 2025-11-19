@@ -102,6 +102,15 @@ export const ENDPOINTS = {
       description: 'Health check endpoint',
     },
   },
+
+  // Memory endpoints
+  MEMORY: {
+    GET_CONTEXT: {
+      path: '/api/memory/context',
+      method: 'GET',
+      description: 'Get memory context for user/project',
+    },
+  },
 };
 
 /**

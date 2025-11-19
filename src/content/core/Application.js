@@ -13,6 +13,7 @@ import { HANDLER_REGISTRY } from '../modules/eventHandlers/registry.js';
 import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
 import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
 import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
+import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
 
 /**
  * Application class
@@ -52,6 +53,9 @@ export class Application {
 
     // Register Claude provider
     registry.register(new ClaudeProvider());
+
+    // Register Qwen provider
+    registry.register(new QwenProvider());
 
     // Future: Register other providers
     // registry.register(new GeminiProvider());
