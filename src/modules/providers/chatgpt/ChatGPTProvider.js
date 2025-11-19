@@ -45,7 +45,7 @@ export class ChatGPTProvider extends BaseProvider {
             // Send API request through background script (bypasses CSP)
             const searchResults = await this.sendBackgroundRequest({
               method: 'POST',
-              endpoint: '/conversations/search',
+              endpoint: '/conversations/fetch-memory',
               data: {
                 query: currentText,
                 user_id: '1',
@@ -55,14 +55,11 @@ export class ChatGPTProvider extends BaseProvider {
               }
             });
 
-            console.log('[ChatGPTProvider] Search results:', searchResults);
+            console.log('[ChatGPTProvider] Search results:', searchResults.synthesized_memory);
 
-            if (searchResults && searchResults.length > 0) {
+            if (searchResults.synthesized_memory && searchResults.synthesized_memory.length > 0) {
               // Format the results into a string
-              const memoryContent = searchResults.map(result =>
-                `[Conversation ID: ${result.conversation_id}]\n${result.content || JSON.stringify(result)}`
-              ).join('\n\n');
-
+              const memoryContent = searchResults.synthesized_memory;
               // Construct the memory block
               const memoryBlock =
                 "[semantix-memory-block]\n" +

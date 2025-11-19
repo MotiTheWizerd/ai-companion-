@@ -106,9 +106,9 @@ export const ENDPOINTS = {
   // Memory endpoints
   MEMORY: {
     SEARCH: {
-      path: '/conversations/search',
+      path: '/conversations/fetch-memory',
       method: 'POST',
-      description: 'Semantic search for conversations',
+      description: 'Semantic fetch-memory for conversations',
     },
   },
 };
