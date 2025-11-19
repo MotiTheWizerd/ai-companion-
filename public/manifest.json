@@ -17,7 +17,7 @@
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://claude.ai/*",
-    "https://gemini.google.com/*",
+    "https://chat.qwen.ai/*",
     "http://localhost:8000/*"
   ],
   "content_scripts": [
@@ -25,9 +25,11 @@
       "matches": [
         "https://chatgpt.com/*",
         "https://claude.ai/*",
-        "https://gemini.google.com/*"
+        "https://chat.qwen.ai/*"
       ],
-      "js": ["src/content/loader.js"],
+      "js": [
+        "src/content/loader.js"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -46,7 +48,7 @@
       "matches": [
         "https://chatgpt.com/*",
         "https://claude.ai/*",
-        "https://gemini.google.com/*"
+        "https://chat.qwen.ai/*"
       ]
     }
   ]

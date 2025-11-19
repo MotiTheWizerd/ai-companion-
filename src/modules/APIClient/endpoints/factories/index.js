@@ -10,6 +10,7 @@ export { MessageRequestFactory } from './MessageRequestFactory.js';
 export { SyncRequestFactory } from './SyncRequestFactory.js';
 export { AnalyticsRequestFactory } from './AnalyticsRequestFactory.js';
 export { HealthRequestFactory } from './HealthRequestFactory.js';
+export { MemoryRequestFactory } from './MemoryRequestFactory.js';
 
 // Import factories for RequestBuilder
 import { ConversationRequestFactory } from './ConversationRequestFactory.js';
@@ -17,6 +18,7 @@ import { MessageRequestFactory } from './MessageRequestFactory.js';
 import { SyncRequestFactory } from './SyncRequestFactory.js';
 import { AnalyticsRequestFactory } from './AnalyticsRequestFactory.js';
 import { HealthRequestFactory } from './HealthRequestFactory.js';
+import { MemoryRequestFactory } from './MemoryRequestFactory.js';
 
 /**
  * Unified RequestBuilder
@@ -48,4 +50,7 @@ export const RequestBuilder = {
 
   // Health methods
   healthCheck: () => HealthRequestFactory.check(),
+
+  // Memory methods
+  searchMemory: (data) => MemoryRequestFactory.search(data),
 };

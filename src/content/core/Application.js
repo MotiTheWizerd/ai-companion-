@@ -15,6 +15,9 @@ import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider
 import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
 import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
 
+import { APIClient } from '../../modules/APIClient/index.js';
+import { API_CONFIG } from './constants.js';
+
 /**
  * Application class
  * Central orchestrator for the AI Conversation Bridge Extension
@@ -30,9 +33,14 @@ export class Application {
     this.messageManager = new MessageManager();
     this.storageManager = new StorageManager();
 
-    // Note: APIClient moved to background service worker
-    // Content scripts cannot make direct API calls due to CSP restrictions
-    // Communication happens via chrome.runtime.sendMessage()
+    // Initialize API Client for making backend requests
+    this.apiClient = new APIClient({
+      baseURL: API_CONFIG.BASE_URL,
+      timeout: API_CONFIG.TIMEOUT,
+      retryAttempts: API_CONFIG.RETRY_ATTEMPTS,
+      retryDelay: API_CONFIG.RETRY_DELAY,
+      maxConcurrent: API_CONFIG.MAX_CONCURRENT,
+    });
 
     // Create managers object for dependency injection
     this.managers = {
@@ -76,6 +84,9 @@ export class Application {
   init() {
     Logger.extension('Initializing...');
 
+    // Initialize API Client
+    this.apiClient.init();
+
     // Initialize network interception
     this.interceptor.init();
 
@@ -85,7 +96,7 @@ export class Application {
     // Expose public API
     exposeAPI(this.conversationManager, this.storageManager);
 
-    Logger.extension('Ready - API requests handled by background service worker');
+    Logger.extension('Ready');
   }
 
   /**

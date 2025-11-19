@@ -38,18 +38,23 @@ export class FetchHandler {
         // Extract and modify user prompt from request body
         if (options?.body) {
           try {
+            console.log('[FetchHandler] Parsing request body...');
             let requestBody = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
 
             // Allow provider to modify the request body
             if (activeProvider && typeof activeProvider.handleRequest === 'function') {
-              requestBody = activeProvider.handleRequest(requestBody);
+              console.log('[FetchHandler] Calling handleRequest...');
+              requestBody = await activeProvider.handleRequest(requestBody);
+              console.log('[FetchHandler] handleRequest completed');
 
               // Update the request body in options
               // We need to re-stringify if it was a string originally
               if (typeof options.body === 'string') {
                 options.body = JSON.stringify(requestBody);
+                console.log('[FetchHandler] Updated request body (stringified)');
               } else {
                 options.body = requestBody;
+                console.log('[FetchHandler] Updated request body (object)');
               }
             }
 

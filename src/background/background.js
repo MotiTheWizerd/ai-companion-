@@ -100,7 +100,7 @@ async function handleSyncConversation(conversationData) {
     const checkStatus = setInterval(() => {
       const status = apiClient.getRequestStatus(requestId);
 
-      if (status && status.status === 'completed') {
+      if (status && status.status === 'success') {
         clearInterval(checkStatus);
         resolve(status.response);
       } else if (status && status.status === 'failed') {
@@ -129,7 +129,7 @@ async function handleAPIRequest(request) {
     const checkStatus = setInterval(() => {
       const status = apiClient.getRequestStatus(requestId);
 
-      if (status && status.status === 'completed') {
+      if (status && status.status === 'success') {
         clearInterval(checkStatus);
         resolve(status.response);
       } else if (status && status.status === 'failed') {

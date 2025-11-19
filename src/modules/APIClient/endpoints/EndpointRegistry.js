@@ -105,10 +105,10 @@ export const ENDPOINTS = {
 
   // Memory endpoints
   MEMORY: {
-    GET_CONTEXT: {
-      path: '/api/memory/context',
-      method: 'GET',
-      description: 'Get memory context for user/project',
+    SEARCH: {
+      path: '/conversations/search',
+      method: 'POST',
+      description: 'Semantic search for conversations',
     },
   },
 };

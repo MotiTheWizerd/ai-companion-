@@ -16,6 +16,8 @@ import { syncFull, syncIncremental } from './syncHelpers.js';
 
 import { trackEvent, healthCheck } from './analyticsHelpers.js';
 
+import { searchMemory } from './memoryHelpers.js';
+
 import { customRequest } from './customRequest.js';
 
 import { APIPromise } from './promiseWrapper.js';
@@ -36,6 +38,7 @@ export class APIHelper {
   static trackEvent = trackEvent;
   static healthCheck = healthCheck;
   static customRequest = customRequest;
+  static searchMemory = searchMemory;
 }
 
 // Export everything for flexibility
@@ -52,6 +55,8 @@ export {
   // Analytics operations
   trackEvent,
   healthCheck,
+  // Memory operations
+  searchMemory,
   // Custom requests
   customRequest,
   // Promise-based API
