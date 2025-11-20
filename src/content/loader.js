@@ -7,11 +7,17 @@
 console.log('[Loader] Content script starting on:', window.location.href);
 
 // Inject main application script into page context
-(function() {
+(function () {
   const script = document.createElement('script');
   script.src = chrome.runtime.getURL('src/content/content.js');
   script.type = 'module';
   (document.head || document.documentElement).appendChild(script);
+
+  // Inject UI styles
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('src/modules/UIControls/styles.css');
+  (document.head || document.documentElement).appendChild(link);
 })();
 
 /**

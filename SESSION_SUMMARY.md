@@ -147,7 +147,7 @@ Backend API
 ### Request Payload Format:
 ```json
 {
-  "user_id": "1",
+  "user_id": "uuid",
   "project_id": "11",
   "conversation_id": "691965b5-2ac8-832d-9ec6-c78eea8e9149",
   "model": "gpt-4",

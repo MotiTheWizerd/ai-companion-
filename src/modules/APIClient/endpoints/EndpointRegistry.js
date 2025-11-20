@@ -11,27 +11,27 @@ export const ENDPOINTS = {
   // Conversation endpoints
   CONVERSATIONS: {
     CREATE: {
-      path: '/api/conversations',
+      path: '/conversations',
       method: 'POST',
       description: 'Create a new conversation',
     },
     GET: {
-      path: '/api/conversations/:id',
+      path: '/conversations/:id',
       method: 'GET',
       description: 'Get conversation by ID',
     },
     UPDATE: {
-      path: '/api/conversations/:id',
+      path: '/conversations/:id',
       method: 'PUT',
       description: 'Update conversation',
     },
     LIST: {
-      path: '/api/conversations',
+      path: '/conversations',
       method: 'GET',
       description: 'List all conversations',
     },
     DELETE: {
-      path: '/api/conversations/:id',
+      path: '/conversations/:id',
       method: 'DELETE',
       description: 'Delete conversation',
     },
@@ -40,22 +40,22 @@ export const ENDPOINTS = {
   // Message endpoints
   MESSAGES: {
     CREATE: {
-      path: '/api/conversations/:conversationId/messages',
+      path: '/conversations/:conversationId/messages',
       method: 'POST',
       description: 'Add message to conversation',
     },
     GET: {
-      path: '/api/messages/:id',
+      path: '/messages/:id',
       method: 'GET',
       description: 'Get message by ID',
     },
     UPDATE: {
-      path: '/api/messages/:id',
+      path: '/messages/:id',
       method: 'PUT',
       description: 'Update message',
     },
     LIST: {
-      path: '/api/conversations/:conversationId/messages',
+      path: '/conversations/:conversationId/messages',
       method: 'GET',
       description: 'List messages in conversation',
     },
@@ -64,17 +64,17 @@ export const ENDPOINTS = {
   // Sync endpoints
   SYNC: {
     FULL: {
-      path: '/api/sync/full',
+      path: '/sync/full',
       method: 'POST',
       description: 'Full conversation sync',
     },
     INCREMENTAL: {
-      path: '/api/sync/incremental',
+      path: '/sync/incremental',
       method: 'POST',
       description: 'Incremental sync of changes',
     },
     STATUS: {
-      path: '/api/sync/status',
+      path: '/sync/status',
       method: 'GET',
       description: 'Get sync status',
     },
@@ -83,12 +83,12 @@ export const ENDPOINTS = {
   // Analytics endpoints
   ANALYTICS: {
     TRACK_EVENT: {
-      path: '/api/analytics/events',
+      path: '/analytics/events',
       method: 'POST',
       description: 'Track analytics event',
     },
     GET_METRICS: {
-      path: '/api/analytics/metrics',
+      path: '/analytics/metrics',
       method: 'GET',
       description: 'Get usage metrics',
     },
@@ -97,7 +97,7 @@ export const ENDPOINTS = {
   // Health check
   HEALTH: {
     CHECK: {
-      path: '/api/health',
+      path: '/health',
       method: 'GET',
       description: 'Health check endpoint',
     },

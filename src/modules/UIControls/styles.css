@@ -1,0 +1,58 @@
+/* Semantix Memory Block Styles */
+.semantix-memory-container {
+  margin: 8px 0;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: inherit;
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+.semantix-memory-header {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: inherit;
+  opacity: 0.8;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.semantix-memory-header:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+}
+
+.semantix-memory-header::after {
+  content: '▼';
+  font-size: 0.7em;
+  transition: transform 0.2s;
+  margin-left: 8px;
+}
+
+.semantix-memory-container.collapsed .semantix-memory-header::after {
+  transform: rotate(-90deg);
+}
+
+.semantix-memory-content {
+  padding: 12px;
+  font-size: 0.85rem;
+  border-top: 1px solid rgba(128, 128, 128, 0.1);
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: block;
+}
+
+.semantix-memory-container.collapsed .semantix-memory-content {
+  display: none;
+}
+
+/* Dark mode adjustments if needed, though opacity/rgba usually handles it */
+@media (prefers-color-scheme: dark) {
+  .semantix-memory-container {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}

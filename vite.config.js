@@ -22,6 +22,11 @@ export default defineConfig({
           src: 'src/background/**/*',
           dest: 'src/background'
         },
+        // Copy configuration files
+        {
+          src: 'src/configuration/**/*',
+          dest: 'src/configuration'
+        },
         // Copy manifest.json from public to dist root
         {
           src: 'public/manifest.json',

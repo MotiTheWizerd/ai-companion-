@@ -79,9 +79,10 @@ async function handleSyncConversation(conversationData) {
 
   const requestData = {
     user_id: API_CONFIG.USER_ID,
-    project_id: API_CONFIG.PROJECT_ID,
+    project_id: conversationData.project_id, // Now comes from content script with provider-specific value
     conversation_id: conversationData.conversation_id,
-    model: conversationData.model || 'gpt-4',
+    session_id: conversationData.session_id || conversationData.conversation_id, // Session ID (same as conversation_id)
+    model: conversationData.model || 'n/a',
     conversation: conversationData.conversation || [],
   };
 

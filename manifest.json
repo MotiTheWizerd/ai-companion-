@@ -24,8 +24,14 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://claude.ai/*", "https://chat.qwen.ai/*"],
-      "js": ["src/loader.js"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://chat.qwen.ai/*"
+      ],
+      "js": [
+        "src/loader.js"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -39,9 +45,14 @@
         "src/content/modules/utils/*.js",
         "src/modules/*.js",
         "src/modules/*/*.js",
-        "src/modules/providers/*/*.js"
+        "src/modules/providers/*/*.js",
+        "src/modules/UIControls/styles.css"
       ],
-      "matches": ["https://chatgpt.com/*", "https://claude.ai/*", "https://chat.qwen.ai/*"]
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://chat.qwen.ai/*"
+      ]
     }
   ]
 }

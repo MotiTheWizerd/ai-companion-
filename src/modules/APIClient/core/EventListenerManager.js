@@ -6,6 +6,7 @@
 import { eventBus } from '../../../content/core/eventBus.js';
 import { EVENTS, API_CONFIG } from '../../../content/core/constants.js';
 import { Logger } from '../../../content/modules/utils/logger.js';
+import { ProviderRegistry } from '../../providers/ProviderRegistry.js';
 
 /**
  * EventListenerManager class
@@ -32,11 +33,11 @@ export class EventListenerManager {
     });
 
     // Auto-sync on stream completion if enabled
-    if (this.config.autoSync) {
-      eventBus.on(EVENTS.STREAM_COMPLETE, (data) => {
-        this.syncConversation(data);
-      });
-    }
+    // if (this.config.autoSync) {
+    //   eventBus.on(EVENTS.STREAM_COMPLETE, (data) => {
+    //     this.syncConversation(data);
+    //   });
+    // }
   }
 
   /**
@@ -46,11 +47,26 @@ export class EventListenerManager {
    * @returns {string} - Request ID
    */
   syncConversation(conversationData) {
+    // Get project_id from conversationData (preferred) or from active provider
+    let projectId = conversationData.project_id;
+
+    if (!projectId) {
+      const providerRegistry = ProviderRegistry.getInstance();
+      const activeProvider = providerRegistry.getActiveProvider();
+      projectId = activeProvider?.providerConfig?.projectId;
+    }
+
+    if (!projectId) {
+      Logger.api('Cannot sync: no projectId available');
+      return null;
+    }
+
     // Transform data to backend expected format
     const requestData = {
       user_id: API_CONFIG.USER_ID,
-      project_id: API_CONFIG.PROJECT_ID,
+      project_id: projectId, // Provider-specific project ID
       conversation_id: conversationData.conversation_id,
+      session_id: conversationData.session_id || conversationData.conversation_id, // Session ID (same as conversation_id)
       model: conversationData.model || 'gpt-4',
       conversation: conversationData.conversation || [],
     };
@@ -59,7 +75,7 @@ export class EventListenerManager {
 
     return this.apiClient.enqueueRequest({
       method: 'POST',
-      endpoint: '/api/conversations',
+      endpoint: '/conversations',
       data: requestData,
     });
   }

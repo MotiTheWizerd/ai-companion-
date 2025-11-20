@@ -96,4 +96,60 @@ export class StorageManager {
       sizeKB: (jsonSize / 1024).toFixed(2)
     };
   }
+
+  // Generic Storage Methods for API Client
+
+  setItem(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error('[Storage] setItem failed:', error);
+      return false;
+    }
+  }
+
+  getItem(key) {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error('[Storage] getItem failed:', error);
+      return null;
+    }
+  }
+
+  updateItem(key, updates) {
+    try {
+      const current = this.getItem(key) || {};
+      const updated = { ...current, ...updates };
+      this.setItem(key, updated);
+      return updated;
+    } catch (error) {
+      console.error('[Storage] updateItem failed:', error);
+      return null;
+    }
+  }
+
+  removeItem(key) {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.error('[Storage] removeItem failed:', error);
+      return false;
+    }
+  }
+
+  addToList(listKey, item) {
+    try {
+      const list = this.getItem(listKey) || [];
+      list.push(item);
+      this.setItem(listKey, list);
+      return list;
+    } catch (error) {
+      console.error('[Storage] addToList failed:', error);
+      return null;
+    }
+  }
 }

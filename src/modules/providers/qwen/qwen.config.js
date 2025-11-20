@@ -7,6 +7,7 @@
 export const QWEN_CONFIG = {
   name: 'Qwen',
   domain: 'chat.qwen.ai',
+  projectId: '11', // Default project ID for Qwen
   endpoints: {
     conversation: '/c/',
   },

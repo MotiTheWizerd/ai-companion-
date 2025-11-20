@@ -3,6 +3,8 @@
  * Centralized location for all constant values used across the extension
  */
 
+import { USER_CONFIG } from '../../configuration/index.js';
+
 /**
  * Event names used throughout the event bus system
  */
@@ -73,9 +75,9 @@ export const API_CONFIG = {
   MAX_CONCURRENT: 5,
   AUTO_SYNC: true,
 
-  // User and project configuration
-  USER_ID: '1',
-  PROJECT_ID: '11',
+  // User configuration (imported from userSettings.json via configuration/index.js)
+  USER_ID: USER_CONFIG.USER_ID,
+  // PROJECT_ID removed - now provider-specific (see provider configs)
 };
 
 /**

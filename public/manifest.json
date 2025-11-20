@@ -43,7 +43,10 @@
         "src/content/modules/utils/*.js",
         "src/modules/*.js",
         "src/modules/*/*.js",
-        "src/modules/providers/**/*.js"
+        "src/modules/providers/**/*.js",
+        "src/modules/UIControls/styles.css",
+        "src/configuration/*.js",
+        "src/configuration/*.json"
       ],
       "matches": [
         "https://chatgpt.com/*",

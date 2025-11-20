@@ -41,22 +41,4 @@ export class BaseProvider {
   isActive() {
     return this.getURLMatcher().matchesDomain(window.location.href);
   }
-
-  /**
-   * Handle/Modify request body before sending
-   * @param {Object} body - Parsed request body
-   * @returns {Object} Modified request body
-   */
-  handleRequest(body) {
-    return body;
-  }
-
-  /**
-   * Extract user prompt from request body
-   * @param {Object} body - Parsed request body
-   * @returns {string|null} User prompt or null
-   */
-  extractPrompt(body) {
-    return body?.prompt || null;
-  }
 }

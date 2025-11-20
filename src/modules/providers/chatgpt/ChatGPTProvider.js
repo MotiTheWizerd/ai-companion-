@@ -1,6 +1,8 @@
 import { BaseProvider } from '../base/BaseProvider.js';
 import { ChatGPTStreamParser } from './ChatGPTStreamParser.js';
 import { ChatGPTURLMatcher } from './ChatGPTURLMatcher.js';
+import { CHATGPT_CONFIG } from './chatgpt.config.js';
+import { API_CONFIG } from '../../../content/core/constants.js';
 
 /**
  * ChatGPT provider implementation
@@ -10,6 +12,7 @@ export class ChatGPTProvider extends BaseProvider {
     super(config);
     this.streamParser = new ChatGPTStreamParser();
     this.urlMatcher = new ChatGPTURLMatcher(config);
+    this.providerConfig = CHATGPT_CONFIG;
   }
 
   getName() {
@@ -48,8 +51,8 @@ export class ChatGPTProvider extends BaseProvider {
               endpoint: '/conversations/fetch-memory',
               data: {
                 query: currentText,
-                user_id: '1',
-                project_id: '11',
+                user_id: API_CONFIG.USER_ID,
+                project_id: this.providerConfig.projectId,
                 limit: 5,
                 min_similarity: 0.5,
               }
@@ -123,11 +126,11 @@ export class ChatGPTProvider extends BaseProvider {
         requestId: requestId
       }, '*');
 
-      // Timeout after 10 seconds
+      // Timeout after 30 seconds
       setTimeout(() => {
         window.removeEventListener('message', responseHandler);
         reject(new Error('Memory search timeout'));
-      }, 10000);
+      }, 30000);
     });
   }
 

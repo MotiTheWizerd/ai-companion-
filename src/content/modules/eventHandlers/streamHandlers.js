@@ -4,6 +4,7 @@
 import { Logger } from '../utils/logger.js';
 import { eventBus } from '../../core/eventBus.js';
 import { EVENTS } from '../../core/constants.js';
+import { ProviderRegistry } from '../../../modules/providers/ProviderRegistry.js';
 
 /**
  * Handle stream start event
@@ -89,10 +90,22 @@ export function handleStreamComplete(data, managers) {
     return;
   }
 
+  // Get active provider and its projectId
+  const providerRegistry = ProviderRegistry.getInstance();
+  const activeProvider = providerRegistry.getActiveProvider();
+  const projectId = activeProvider?.providerConfig?.projectId;
+
+  if (!projectId) {
+    Logger.api('Skipping sync: no projectId available from active provider');
+    return;
+  }
+
   // Create payload with only the latest exchange
   const syncPayload = {
     conversation_id: fullConversation.conversation_id,
+    session_id: fullConversation.conversation_id, // Session ID (same as conversation_id)
     model: fullConversation.model,
+    project_id: projectId, // Provider-specific project ID
     conversation: [lastUserMessage, lastAssistantMessage]
   };
 
@@ -121,7 +134,7 @@ export function handleStreamComplete(data, managers) {
     window.removeEventListener('message', handleResponse);
 
     if (event.data.success) {
-      Logger.api(`Sync successful: ${conversation.conversation_id}`);
+      Logger.api(`Sync successful: ${fullConversation.conversation_id}`);
     } else {
       Logger.api(`Sync failed: ${event.data.error || 'Unknown error'}`);
     }
@@ -134,3 +147,4 @@ export function handleStreamComplete(data, managers) {
     window.removeEventListener('message', handleResponse);
   }, 30000);
 }
+

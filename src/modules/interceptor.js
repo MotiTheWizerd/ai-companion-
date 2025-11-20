@@ -12,13 +12,22 @@ export class NetworkInterceptor {
 
   init() {
     this.interceptFetch();
+
+    // Initialize UI Controls
+    console.log('[Interceptor] Attempting to load UIControls...');
+    import('./UIControls/index.js').then(module => {
+      console.log('[Interceptor] UIControls module loaded');
+      const uiController = new module.UIController();
+      uiController.init();
+    }).catch(err => console.error('[Interceptor] Failed to load UIControls:', err));
+
     console.log('[Interceptor] Initialized');
   }
 
   interceptFetch() {
     const self = this;
 
-    window.fetch = async function(...args) {
+    window.fetch = async function (...args) {
       const [url, options] = args;
 
       // Call original fetch
