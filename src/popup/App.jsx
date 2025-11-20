@@ -3,14 +3,35 @@ import React, { useState, useEffect } from 'react';
 function App() {
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState('Ready');
+  const [platform, setPlatform] = useState(null);
+  const [selectedProject, setSelectedProject] = useState('');
+
+  // Mock project data
+  const projects = [
+    { id: '1', name: 'AI Research Platform' },
+    { id: '2', name: 'Customer Support Bot' },
+    { id: '3', name: 'Content Generation' },
+    { id: '4', name: 'Data Analysis Tool' },
+    { id: '5', name: 'Personal Assistant' }
+  ];
 
   useEffect(() => {
     // Query active tab and get messages from content script
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]?.url?.includes('chatgpt.com')) {
-        setStatus('ChatGPT detected');
+      const url = tabs[0]?.url || '';
+
+      if (url.includes('chatgpt.com')) {
+        setStatus('ChatGPT Detected');
+        setPlatform('chatgpt');
+      } else if (url.includes('claude.ai')) {
+        setStatus('Claude Detected');
+        setPlatform('claude');
+      } else if (url.includes('chat.qwen.ai')) {
+        setStatus('Qwen Detected');
+        setPlatform('qwen');
       } else {
-        setStatus('Navigate to chatgpt.com');
+        setStatus('Navigate to ChatGPT, Claude, or Qwen');
+        setPlatform(null);
       }
     });
   }, []);
@@ -43,28 +64,24 @@ function App() {
 
   return (
     <div className="container">
-      <h1>ChatGPT Extension</h1>
-      <p className="status">Status: {status}</p>
+      <h1>AI Conversation Bridge</h1>
+      <p className={`status ${!platform ? 'inactive' : ''}`}>{status}</p>
 
-      <div className="actions">
-        <button onClick={exportMessages}>Load Messages</button>
-        {messages.length > 0 && (
-          <button onClick={downloadJSON}>Download JSON</button>
-        )}
-      </div>
-
-      {messages.length > 0 && (
-        <div className="messages">
-          <h3>Messages ({messages.length})</h3>
-          {messages.map((msg, idx) => (
-            <div key={idx} className={`message ${msg.role}`}>
-              <strong>{msg.role}:</strong>
-              <p>{msg.text.substring(0, 100)}...</p>
-              <small>{msg.model || 'N/A'}</small>
-            </div>
+      <div className="project-selector">
+        <label htmlFor="project-select">Project</label>
+        <select
+          id="project-select"
+          value={selectedProject}
+          onChange={(e) => setSelectedProject(e.target.value)}
+        >
+          <option value="">Select a project...</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
           ))}
-        </div>
-      )}
+        </select>
+      </div>
     </div>
   );
 }

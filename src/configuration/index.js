@@ -1,10 +1,10 @@
 /**
  * Configuration Module
- * Loads and exports user and API configuration from JSON files
+ * Loads and exports user and API configuration from JS modules
  */
 
-import userSettings from './userSettings.json';
-import apiConfig from './apiConfig.json';
+import userSettings from './userSettings.js';
+import apiConfig from './apiConfig.js';
 
 /**
  * User configuration

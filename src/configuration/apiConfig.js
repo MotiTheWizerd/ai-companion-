@@ -1,0 +1,7 @@
+export default {
+    baseUrl: "http://localhost:8000",
+    timeout: 30000,
+    retryAttempts: 3,
+    retryDelay: 1000,
+    maxConcurrent: 5
+};

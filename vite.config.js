@@ -31,6 +31,11 @@ export default defineConfig({
         {
           src: 'public/manifest.json',
           dest: '.'
+        },
+        // Copy icons folder
+        {
+          src: 'icons/**/*',
+          dest: 'icons'
         }
       ]
     })
