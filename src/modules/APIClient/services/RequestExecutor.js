@@ -22,7 +22,9 @@ export class RequestExecutor {
   async execute(request) {
     const { method, endpoint, data, headers = {} } = request;
     const url = this.buildURL(endpoint);
-    const isBackground = typeof window === 'undefined';
+    // Treat extension pages (popup, options) as background for direct fetch
+    const isBackground = typeof window === 'undefined' ||
+      (window.location && window.location.protocol === 'chrome-extension:');
 
     if (isBackground) {
       // Direct fetch in background (no CSP restrictions)

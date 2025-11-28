@@ -111,6 +111,15 @@ export const ENDPOINTS = {
       description: 'Semantic fetch-memory for conversations',
     },
   },
+
+  // Project endpoints
+  PROJECTS: {
+    GET_BY_USER: {
+      path: '/user-projects/user/:userId',
+      method: 'GET',
+      description: 'Get projects by user ID',
+    },
+  },
 };
 
 /**

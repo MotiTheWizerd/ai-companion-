@@ -41,10 +41,18 @@ export class FetchHandler {
             console.log('[FetchHandler] Parsing request body...');
             let requestBody = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
 
-            // Allow provider to modify the request body
+            // Allow provider to modify the request body (include conversation context)
             if (activeProvider && typeof activeProvider.handleRequest === 'function') {
+              // Try to derive conversation ID from request body if URL didn't have it
+              const bodyConversationId = requestBody?.conversation_id || requestBody?.conversationId;
+              if (!conversationId && bodyConversationId) {
+                conversationId = bodyConversationId;
+              }
+
               console.log('[FetchHandler] Calling handleRequest...');
-              requestBody = await activeProvider.handleRequest(requestBody);
+              requestBody = await activeProvider.handleRequest(requestBody, {
+                conversationId,
+              });
               console.log('[FetchHandler] handleRequest completed');
 
               // Update the request body in options

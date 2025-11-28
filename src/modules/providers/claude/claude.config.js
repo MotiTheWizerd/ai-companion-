@@ -4,7 +4,7 @@
 export const CLAUDE_CONFIG = {
   name: 'Claude',
   domain: 'claude.ai',
-  projectId: '11', // Default project ID for Claude
+  projectId: '12', // Separate project ID for Claude (GPT uses '11')
   endpoints: {
     conversation: '/api/organizations',
   },

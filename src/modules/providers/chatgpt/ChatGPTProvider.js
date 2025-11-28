@@ -32,9 +32,11 @@ export class ChatGPTProvider extends BaseProvider {
    * @param {Object} body - Parsed request body
    * @returns {Object} Modified request body
    */
-  async handleRequest(body) {
+  async handleRequest(body, context = {}) {
     console.log('[ChatGPTProvider] handleRequest called', body);
     try {
+      const sessionId = context?.conversationId || null;
+
       // Check for standard message structure
       if (body?.messages?.[0]?.content?.parts?.[0]) {
         const currentText = body.messages[0].content.parts[0];
@@ -45,6 +47,31 @@ export class ChatGPTProvider extends BaseProvider {
           try {
             console.log('[ChatGPTProvider] Requesting memory search via background...');
 
+            // Get selected project from chrome.storage
+            let selectedProjectId = this.providerConfig.projectId; // Default fallback
+            try {
+              selectedProjectId = await new Promise((resolve, reject) => {
+                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                  chrome.storage.local.get(['selectedProjectId'], (result) => {
+                    if (chrome.runtime.lastError) {
+                      console.warn('[ChatGPTProvider] Chrome storage error:', chrome.runtime.lastError);
+                      resolve(this.providerConfig.projectId);
+                    } else {
+                      resolve(result.selectedProjectId || this.providerConfig.projectId);
+                    }
+                  });
+                } else {
+                  console.warn('[ChatGPTProvider] chrome.storage not available, using default project');
+                  resolve(this.providerConfig.projectId);
+                }
+              });
+            } catch (storageError) {
+              console.warn('[ChatGPTProvider] Failed to read from chrome.storage:', storageError);
+              selectedProjectId = this.providerConfig.projectId;
+            }
+
+            console.log('[ChatGPTProvider] Using project ID:', selectedProjectId);
+
             // Send API request through background script (bypasses CSP)
             const searchResults = await this.sendBackgroundRequest({
               method: 'POST',
@@ -52,7 +79,8 @@ export class ChatGPTProvider extends BaseProvider {
               data: {
                 query: currentText,
                 user_id: API_CONFIG.USER_ID,
-                project_id: this.providerConfig.projectId,
+                project_id: selectedProjectId,
+                session_id: sessionId,
                 limit: 5,
                 min_similarity: 0.5,
               }
@@ -130,7 +158,7 @@ export class ChatGPTProvider extends BaseProvider {
       setTimeout(() => {
         window.removeEventListener('message', responseHandler);
         reject(new Error('Memory search timeout'));
-      }, 30000);
+      }, 60000);
     });
   }
 

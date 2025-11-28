@@ -11,6 +11,7 @@ export { SyncRequestFactory } from './SyncRequestFactory.js';
 export { AnalyticsRequestFactory } from './AnalyticsRequestFactory.js';
 export { HealthRequestFactory } from './HealthRequestFactory.js';
 export { MemoryRequestFactory } from './MemoryRequestFactory.js';
+export { ProjectRequestFactory } from './ProjectRequestFactory.js';
 
 // Import factories for RequestBuilder
 import { ConversationRequestFactory } from './ConversationRequestFactory.js';
@@ -19,6 +20,7 @@ import { SyncRequestFactory } from './SyncRequestFactory.js';
 import { AnalyticsRequestFactory } from './AnalyticsRequestFactory.js';
 import { HealthRequestFactory } from './HealthRequestFactory.js';
 import { MemoryRequestFactory } from './MemoryRequestFactory.js';
+import { ProjectRequestFactory } from './ProjectRequestFactory.js';
 
 /**
  * Unified RequestBuilder
@@ -53,4 +55,7 @@ export const RequestBuilder = {
 
   // Memory methods
   searchMemory: (data) => MemoryRequestFactory.search(data),
+
+  // Project methods
+  getProjectsByUser: (userId) => ProjectRequestFactory.getByUser(userId),
 };
