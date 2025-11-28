@@ -46,31 +46,7 @@ export class ChatGPTProvider extends BaseProvider {
         if (typeof currentText === 'string' && currentText.trim().length > 0) {
           try {
             console.log('[ChatGPTProvider] Requesting memory search via background...');
-
-            // Get selected project from chrome.storage
-            let selectedProjectId = this.providerConfig.projectId; // Default fallback
-            try {
-              selectedProjectId = await new Promise((resolve, reject) => {
-                if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                  chrome.storage.local.get(['selectedProjectId'], (result) => {
-                    if (chrome.runtime.lastError) {
-                      console.warn('[ChatGPTProvider] Chrome storage error:', chrome.runtime.lastError);
-                      resolve(this.providerConfig.projectId);
-                    } else {
-                      resolve(result.selectedProjectId || this.providerConfig.projectId);
-                    }
-                  });
-                } else {
-                  console.warn('[ChatGPTProvider] chrome.storage not available, using default project');
-                  resolve(this.providerConfig.projectId);
-                }
-              });
-            } catch (storageError) {
-              console.warn('[ChatGPTProvider] Failed to read from chrome.storage:', storageError);
-              selectedProjectId = this.providerConfig.projectId;
-            }
-
-            console.log('[ChatGPTProvider] Using project ID:', selectedProjectId);
+            console.log('[ChatGPTProvider] Project ID: (Waiting for Loader injection)');
 
             // Send API request through background script (bypasses CSP)
             const searchResults = await this.sendBackgroundRequest({
@@ -79,7 +55,7 @@ export class ChatGPTProvider extends BaseProvider {
               data: {
                 query: currentText,
                 user_id: API_CONFIG.USER_ID,
-                project_id: selectedProjectId,
+                project_id: null, // Enforce loader injection
                 session_id: sessionId,
                 limit: 5,
                 min_similarity: 0.5,

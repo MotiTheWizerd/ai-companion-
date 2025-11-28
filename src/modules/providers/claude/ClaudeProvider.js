@@ -46,6 +46,7 @@ export class ClaudeProvider extends BaseProvider {
         if (typeof currentText === 'string' && currentText.trim().length > 0) {
           try {
             console.log('[ClaudeProvider] Requesting memory search via background...');
+            console.log('[ClaudeProvider] Project ID: (Waiting for Loader injection)');
 
             // Send API request through background script (bypasses CSP)
             const searchResults = await this.sendBackgroundRequest({
@@ -54,7 +55,7 @@ export class ClaudeProvider extends BaseProvider {
               data: {
                 query: currentText,
                 user_id: API_CONFIG.USER_ID,
-                project_id: this.providerConfig.projectId,
+                project_id: null, // Enforce loader injection
                 session_id: sessionId,
                 limit: 5,
                 min_similarity: 0.5,
@@ -133,7 +134,7 @@ export class ClaudeProvider extends BaseProvider {
       setTimeout(() => {
         window.removeEventListener('message', responseHandler);
         reject(new Error('Memory search timeout'));
-      },  60000);
+      }, 60000);
     });
   }
 

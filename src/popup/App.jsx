@@ -14,25 +14,27 @@ function App() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const handleProjectChange = (e) => {
     const newValue = e.target.value;
+    console.log('[Popup] Project changed to:', newValue);
     setSelectedProject(newValue);
-    chrome.storage.local.set({ selectedProjectId: newValue });
+
+    // Save to chrome.storage with error handling
+    try {
+      chrome.storage.local.set({ selectedProjectId: newValue }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('[Popup] Error saving selected project:', chrome.runtime.lastError);
+        } else {
+          console.log('[Popup] Selected project saved to storage:', newValue);
+        }
+      });
+    } catch (error) {
+      console.error('[Popup] Failed to save selected project:', error);
+    }
   };
 
   const apiClientRef = useRef(null);
   const projectsRequestIdRef = useRef(null);
 
   useEffect(() => {
-    // Load selected project from chrome.storage on mount
-    try {
-      chrome.storage.local.get(['selectedProjectId'], (result) => {
-        if (result.selectedProjectId) {
-          setSelectedProject(result.selectedProjectId);
-        }
-      });
-    } catch (error) {
-      console.warn('[Popup] Failed to load selected project from storage:', error);
-    }
-
     // Initialize API Client
     const client = new APIClient({
       baseURL: API_CONFIG.BASE_URL,
@@ -62,6 +64,27 @@ function App() {
         console.log('[Popup] Extracted Project List:', projectList);
         setProjects(projectList);
         setIsLoadingProjects(false);
+
+        // Save projects to cache in user_settings
+        try {
+          chrome.storage.local.get(['user_settings'], (result) => {
+            if (chrome.runtime.lastError) {
+              console.warn('[Popup] Error accessing storage for cache save:', chrome.runtime.lastError);
+              return;
+            }
+            const userSettings = result.user_settings || {};
+            userSettings.projects = projectList;
+            chrome.storage.local.set({ user_settings: userSettings }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[Popup] Error saving to cache:', chrome.runtime.lastError);
+              } else {
+                console.log('[Popup] Projects cached to user_settings');
+              }
+            });
+          });
+        } catch (error) {
+          console.warn('[Popup] Failed to cache projects:', error);
+        }
       }
     };
 
@@ -77,14 +100,66 @@ function App() {
     eventBus.on(EVENTS.API_REQUEST_SUCCESS, handleApiSuccess);
     eventBus.on(EVENTS.API_REQUEST_FAILED, handleApiFailure);
 
-    // Fetch Projects
-    if (USER_CONFIG.USER_ID) {
-      setIsLoadingProjects(true);
-      const request = RequestBuilder.getProjectsByUser(USER_CONFIG.USER_ID);
-      const reqId = client.enqueueRequest(request);
-      projectsRequestIdRef.current = reqId;
-    } else {
-      console.warn('No User ID found in configuration');
+    // Load both selected project and projects list from storage together
+    try {
+      chrome.storage.local.get(['selectedProjectId', 'user_settings'], (result) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[Popup] Error loading from storage:', chrome.runtime.lastError);
+          // Fall back to fetching from server
+          if (USER_CONFIG.USER_ID) {
+            setIsLoadingProjects(true);
+            const request = RequestBuilder.getProjectsByUser(USER_CONFIG.USER_ID);
+            const reqId = client.enqueueRequest(request);
+            projectsRequestIdRef.current = reqId;
+          } else {
+            console.warn('No User ID found in configuration');
+            setIsLoadingProjects(false);
+          }
+          return;
+        }
+
+        // Load selected project first
+        if (result.selectedProjectId) {
+          console.log('[Popup] Loaded selected project from storage:', result.selectedProjectId);
+          setSelectedProject(result.selectedProjectId);
+        } else {
+          console.log('[Popup] No previously selected project found');
+        }
+
+        // Then load cached projects
+        const cachedProjects = result.user_settings?.projects;
+
+        if (cachedProjects && Array.isArray(cachedProjects) && cachedProjects.length > 0) {
+          // Use cached projects immediately for speed
+          console.log('[Popup] Loading projects from cache (stale-while-revalidate):', cachedProjects);
+          setProjects(cachedProjects);
+          // Don't set isLoadingProjects to false yet, as we are about to fetch fresh data
+        }
+
+        // Always fetch fresh data from server to update cache
+        console.log('[Popup] Fetching fresh projects from server...');
+        if (USER_CONFIG.USER_ID) {
+          setIsLoadingProjects(true);
+          const request = RequestBuilder.getProjectsByUser(USER_CONFIG.USER_ID);
+          const reqId = client.enqueueRequest(request);
+          projectsRequestIdRef.current = reqId;
+        } else {
+          console.warn('No User ID found in configuration');
+          setIsLoadingProjects(false);
+        }
+      });
+    } catch (error) {
+      console.error('[Popup] Failed to access chrome.storage:', error);
+      // Fall back to fetching from server
+      if (USER_CONFIG.USER_ID) {
+        setIsLoadingProjects(true);
+        const request = RequestBuilder.getProjectsByUser(USER_CONFIG.USER_ID);
+        const reqId = client.enqueueRequest(request);
+        projectsRequestIdRef.current = reqId;
+      } else {
+        console.warn('No User ID found in configuration');
+        setIsLoadingProjects(false);
+      }
     }
 
     // Query active tab and get messages from content script
