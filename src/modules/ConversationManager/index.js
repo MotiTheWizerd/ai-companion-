@@ -1,13 +1,31 @@
+import { UniversalSelector } from './selectors/index.js';
+
 /**
  * ConversationManager - Manages conversation state
  */
 export class ConversationManager {
   constructor() {
+    this.selectors = new UniversalSelector();
     this.conversation = {
       conversation_id: null,
       model: null,
       conversation: []
     };
+  }
+
+  /**
+   * Set the provider for selectors
+   * @param {string} providerName 
+   */
+  setProvider(providerName) {
+    this.selectors.setProvider(providerName);
+  }
+
+  /**
+   * Get the selectors instance
+   */
+  getSelectors() {
+    return this.selectors;
   }
 
   /**

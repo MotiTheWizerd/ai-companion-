@@ -14,24 +14,24 @@ import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
 import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
 import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
 import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
+import { ToolbarController } from '../../modules/UIControls/index.js';
 
 import { APIClient } from '../../modules/APIClient/index.js';
 import { API_CONFIG } from './constants.js';
 
-/**
- * Application class
- * Central orchestrator for the AI Conversation Bridge Extension
- */
 export class Application {
   constructor() {
-    // Initialize provider registry first
-    this.initializeProviders();
-
     // Initialize core modules
     this.interceptor = new NetworkInterceptor();
     this.conversationManager = new ConversationManager();
     this.messageManager = new MessageManager();
     this.storageManager = new StorageManager();
+
+    // Initialize provider registry and set active provider
+    this.initializeProviders();
+
+    // Initialize UI Controllers
+    this.toolbarController = new ToolbarController(this.conversationManager);
 
     // Initialize API Client for making backend requests
     this.apiClient = new APIClient({
@@ -65,13 +65,11 @@ export class Application {
     // Register Qwen provider
     registry.register(new QwenProvider());
 
-    // Future: Register other providers
-    // registry.register(new GeminiProvider());
-
     // Detect active provider
     const activeProvider = registry.detectActiveProvider();
     if (activeProvider) {
       Logger.extension(`Active AI provider: ${activeProvider.getName()}`);
+      this.conversationManager.setProvider(activeProvider.getName());
     } else {
       Logger.extension('No AI provider detected for current page');
     }
@@ -89,6 +87,9 @@ export class Application {
 
     // Initialize network interception
     this.interceptor.init();
+
+    // Initialize UI Controllers
+    this.toolbarController.init();
 
     // Subscribe to events using registry pattern
     this.setupEventListeners();
