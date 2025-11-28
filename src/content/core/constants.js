@@ -37,6 +37,12 @@ export const EVENTS = {
   API_SYNC_START: 'api:sync:start',
   API_SYNC_COMPLETE: 'api:sync:complete',
   API_SYNC_ERROR: 'api:sync:error',
+
+  // Chat History events
+  CONVERSATION_RESUME: 'conversation:resume',
+  CHAT_HISTORY_CAPTURE: 'chat:history:capture',
+  CHAT_HISTORY_CAPTURED: 'chat:history:captured',
+  CLAUDE_API_RESPONSE: 'claude:api:response',
 };
 
 /**

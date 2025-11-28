@@ -32,6 +32,12 @@ import {
   handleAPISyncError,
 } from './apiHandlers.js';
 
+import {
+  handleConversationResume,
+  handleChatHistoryCapture,
+  handleClaudeApiResponse,
+} from './chatHistoryHandlers.js';
+
 /**
  * Handler Registry
  * Maps event names to their corresponding handler functions
@@ -63,4 +69,9 @@ export const HANDLER_REGISTRY = {
   [EVENTS.API_SYNC_START]: handleAPISyncStart,
   [EVENTS.API_SYNC_COMPLETE]: handleAPISyncComplete,
   [EVENTS.API_SYNC_ERROR]: handleAPISyncError,
+
+  // Chat History events
+  [EVENTS.CONVERSATION_RESUME]: handleConversationResume,
+  [EVENTS.CHAT_HISTORY_CAPTURE]: handleChatHistoryCapture,
+  [EVENTS.CLAUDE_API_RESPONSE]: handleClaudeApiResponse,
 };

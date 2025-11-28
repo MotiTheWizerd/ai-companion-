@@ -19,3 +19,9 @@ export {
   handleAPISyncComplete,
   handleAPISyncError,
 } from './apiHandlers.js';
+
+export {
+  handleConversationResume,
+  handleChatHistoryCapture,
+  handleClaudeApiResponse,
+} from './chatHistoryHandlers.js';

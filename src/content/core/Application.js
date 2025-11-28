@@ -18,6 +18,7 @@ import { ToolbarController } from '../../modules/UIControls/index.js';
 
 import { APIClient } from '../../modules/APIClient/index.js';
 import { API_CONFIG } from './constants.js';
+import { UniversalChatHistory, EventIntegration } from '../../modules/UniversalChatHistory/index.js';
 
 export class Application {
   constructor() {
@@ -42,11 +43,16 @@ export class Application {
       maxConcurrent: API_CONFIG.MAX_CONCURRENT,
     });
 
+    // Initialize Universal Chat History module
+    this.chatHistoryManager = new UniversalChatHistory();
+    this.eventIntegration = new EventIntegration(this.chatHistoryManager, eventBus);
+
     // Create managers object for dependency injection
     this.managers = {
       conversationManager: this.conversationManager,
       messageManager: this.messageManager,
       storageManager: this.storageManager,
+      chatHistoryManager: this.chatHistoryManager, // Add to managers for event handlers
     };
   }
 
@@ -90,6 +96,9 @@ export class Application {
 
     // Initialize UI Controllers
     this.toolbarController.init();
+
+    // Initialize Universal Chat History monitoring
+    this.chatHistoryManager.setupResumeChatObserver();
 
     // Subscribe to events using registry pattern
     this.setupEventListeners();

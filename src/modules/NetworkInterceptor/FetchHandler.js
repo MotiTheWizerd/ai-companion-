@@ -1,4 +1,6 @@
 import { ProviderRegistry } from '../providers/ProviderRegistry.js';
+import { eventBus } from '../../content/core/eventBus.js';
+import { EVENTS } from '../../content/core/constants.js';
 
 /**
  * FetchHandler - Handles fetch interception and stream processing
@@ -79,8 +81,46 @@ export class FetchHandler {
         }
       }
 
+      // Check if this is a Claude conversation retrieval API request
+      // More generic pattern to catch any Claude API call that might contain conversation data
+      const isClaudeConversationRetrieval = typeof url === 'string' &&
+                                           url.includes('claude.ai/api/') &&
+                                           (url.includes('/chat_conversations/') || url.includes('/conversations/')) &&
+                                           !url.includes('/completion') &&
+                                           !url.includes('/stream');
+
+      // More specific pattern for Claude conversation details API
+      const isClaudeConversationDetails = typeof url === 'string' &&
+                                         url.includes('claude.ai/api/') &&
+                                         url.includes('/chat_conversations/') &&
+                                         url.includes('tree=True') &&
+                                         url.includes('rendering_mode=messages');
+
+      // Use the more specific pattern for conversation retrieval
+      const shouldIntercept = isClaudeConversationRetrieval || isClaudeConversationDetails;
+
+      // Debug logging for Claude API detection
+      if (typeof url === 'string' && url.includes('claude.ai')) {
+        console.log(`[FetchHandler] Detected Claude-related URL: ${url}`);
+        console.log(`[FetchHandler]   - Is basic retrieval: ${isClaudeConversationRetrieval}`);
+        console.log(`[FetchHandler]   - Is details retrieval: ${isClaudeConversationDetails}`);
+        console.log(`[FetchHandler]   - Should intercept: ${shouldIntercept}`);
+
+        // Extra logging if this is an API call but not matching our patterns
+        if (url.includes('/api/') && !shouldIntercept) {
+          console.log(`[FetchHandler]   - This is a Claude API call but doesn't match our interception patterns`);
+          console.log(`[FetchHandler]   - Expected patterns: contains /chat_conversations/ or /conversations/, with tree=True and rendering_mode=messages, but not /completion/ or /stream/`);
+        }
+      }
+
       // Call original fetch
       const response = await self.originalFetch.apply(this, args);
+
+      // If this was a conversation retrieval request, intercept the response
+      if (shouldIntercept) {
+        console.log(`[FetchHandler] Processing Claude conversation retrieval for URL: ${url}`);
+        return self.handleClaudeConversationRetrieval(response, url);
+      }
 
       if (isConversationEndpoint) {
         return self.handleConversationStream(response, activeProvider, userPrompt, conversationId);
@@ -138,6 +178,39 @@ export class FetchHandler {
       statusText: response.statusText,
       headers: response.headers
     });
+  }
+
+  /**
+   * Handle Claude conversation retrieval response
+   * This intercepts API responses that contain full conversation data
+   */
+  async handleClaudeConversationRetrieval(response, url) {
+    // Clone the response to read its body
+    const responseClone = response.clone();
+
+    try {
+      // Check if the response is JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await responseClone.json();
+
+        console.log('[FetchHandler] Intercepted Claude conversation data:', data);
+
+        // Emit an event with the conversation data
+        eventBus.emit(EVENTS.CLAUDE_API_RESPONSE, {
+          responseData: data,
+          apiUrl: url,
+          timestamp: new Date().toISOString()
+        });
+
+        console.log('[FetchHandler] Emitted CLAUDE_API_RESPONSE event');
+      }
+    } catch (error) {
+      console.warn('[FetchHandler] Could not parse Claude conversation response as JSON:', error);
+    }
+
+    // Return the original response unchanged
+    return response;
   }
 
   /**
