@@ -1,64 +1,50 @@
-# Implementation Plan - Chat Timeline Feature
+# Implementation Plan - Reliable ChatGPT Interception
 
-## Goal
-Create a "Timeline" sidebar on the right side of the chat interface that displays dots for every user message. Clicking a dot should scroll the chat view to the corresponding message.
+The current interception mechanism fails for ChatGPT because the extension's module-based architecture loads asynchronously (`type="module"`), causing it to initialize **after** ChatGPT's application code has already saved a reference to `window.fetch` and initiated the conversation retrieval.
+
+To solve this, we will implement an **Immediate Injection Strategy**.
 
 ## User Review Required
 > [!IMPORTANT]
-> **Selector Verification**: The implementation relies on CSS selectors to find user messages in the DOM. I am using a best-guess selector for Claude (`.font-user-message`). This may need adjustment if it doesn't match the current Claude DOM structure.
+> This change involves injecting a script into the page context immediately at `document_start`. This is a standard pattern for extensions but requires careful handling to avoid breaking the host page.
 
 ## Proposed Changes
 
-### Module: Timeline
-Create a new module to handle the timeline UI and logic.
+### 1. Create Immediate Interceptor Script
+Create a new standalone script `src/content/injected/immediate-interceptor.js` that has **NO dependencies**.
 
-#### [NEW] [TimelineController.js](file:///c:/project/semantix-bridge/gpt-extenstion/src/modules/Timeline/TimelineController.js)
-- **Responsibility**: 
-    - Inject the timeline sidebar into the DOM.
-    - Subscribe to `ChatHistoryManager` updates.
-    - Render dots for user messages.
-    - Handle click events to scroll to messages.
-- **Key Methods**:
-    - `init()`: Setup and injection.
-    - `render(conversation)`: Update UI based on history.
-    - `scrollToMessage(index)`: Find DOM element and scroll.
+**Responsibilities:**
+- Wrap `window.fetch` immediately.
+- Wrap `XMLHttpRequest` immediately.
+- Detect ChatGPT conversation API calls (`/backend-api/conversation`).
+- When a matching response is found:
+    - Clone/Parse the response.
+    - Dispatch a custom DOM event `semantix:chatgpt-response` with the data.
+- Add a "catch-all" debug log to prove it's running first.
 
-#### [NEW] [index.js](file:///c:/project/semantix-bridge/gpt-extenstion/src/modules/Timeline/index.js)
-- Export `TimelineController`.
+### 2. Update Loader Script
+Modify `src/content/loader.js` to inject this new script **before** the main `content.js`.
 
-#### [NEW] [styles.css](file:///c:/project/semantix-bridge/gpt-extenstion/src/modules/Timeline/styles.css)
-- Styles for the fixed right sidebar, dots, and hover effects.
-- **Design**:
-    - Fixed position right (e.g., `right: 20px`, `top: 50%`).
-    - Vertical flex container.
-    - Dots: small circles, distinct color for user messages.
-    - Tooltip on hover (optional, maybe showing snippet).
+- It must be injected as a standard script (not `type="module"`) to ensure earliest possible execution.
+- It should be appended to `document.documentElement` (html tag) to run before `head` is fully parsed if possible.
 
-### Module: ConversationManager
-Update selectors to support finding messages.
+### 3. Update Event Integration
+Modify `src/modules/UniversalChatHistory/eventIntegration.js` (or a new handler) to listen for the `semantix:chatgpt-response` DOM event.
 
-#### [MODIFY] [ClaudeSelector.js](file:///c:/project/semantix-bridge/gpt-extenstion/src/modules/ConversationManager/selectors/providers/ClaudeSelector.js)
-- Add `getUserMessage()` method returning the CSS selector for user message containers.
-- **Proposed Selector**: `.font-user-message` (to be verified).
-
-#### [MODIFY] [UniversalSelector.js](file:///c:/project/semantix-bridge/gpt-extenstion/src/modules/ConversationManager/selectors/UniversalSelector.js)
-- Expose `getUserMessage()` method.
-
-### Core: Application
-Wire up the new module.
-
-#### [MODIFY] [Application.js](file:///c:/project/semantix-bridge/gpt-extenstion/src/content/core/Application.js)
-- Import `TimelineController`.
-- Initialize `TimelineController` with `conversationManager` and `chatHistoryManager`.
-- Call `timelineController.init()`.
+- Bridge this event to the internal `eventBus`.
+- Trigger the existing `captureChatGPTConversationData` flow.
 
 ## Verification Plan
 
 ### Automated Tests
-- None (UI feature).
+- None (requires browser environment).
 
 ### Manual Verification
-1.  **Injection**: Verify the timeline sidebar appears on the right side of the screen when a chat is loaded.
-2.  **Rendering**: Verify dots appear corresponding to the number of user messages in the history.
-3.  **Navigation**: Click a dot and verify the page scrolls to the correct user message.
-4.  **Updates**: Send a new message and verify a new dot appears.
+1.  **Rebuild Extension**: `pnpm build`.
+2.  **Reload Extension**: In `chrome://extensions`.
+3.  **Refresh ChatGPT Page**: Open a conversation.
+4.  **Check Console**:
+    - Look for `[Semantix Immediate] Interceptor initialized`.
+    - Look for `[Semantix Immediate] Fetch captured: ...`.
+    - Look for `[Semantix Immediate] Dispatching event ...`.
+    - Verify `ChatHistoryManager` captures the data.

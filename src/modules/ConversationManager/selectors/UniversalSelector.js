@@ -16,6 +16,9 @@ export class UniversalSelector {
         switch (name.toLowerCase()) {
             case 'claude':
                 return new ClaudeSelector();
+            case 'chatgpt':
+                // ChatGPT uses the same DOM structure as Claude for toolbar injection
+                return new ClaudeSelector();
             default:
                 console.warn(`[UniversalSelector] Unknown provider: ${name}, defaulting to Claude`);
                 return new ClaudeSelector();

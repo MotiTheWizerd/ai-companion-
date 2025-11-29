@@ -23,4 +23,12 @@ export class BaseURLMatcher {
   isConversationEndpoint(url) {
     throw new Error('isConversationEndpoint() must be implemented');
   }
+  /**
+   * Extract conversation ID from URL if it's a conversation page
+   * @param {string} url
+   * @returns {string|null} Conversation ID or null
+   */
+  getConversationId(url) {
+    return null;
+  }
 }

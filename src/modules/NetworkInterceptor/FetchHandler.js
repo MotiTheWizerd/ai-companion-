@@ -21,6 +21,11 @@ export class FetchHandler {
     window.fetch = async function (...args) {
       const [url, options] = args;
 
+      // Debug: Log ALL ChatGPT requests to see what's passing through
+      if (typeof url === 'string' && (url.includes('chatgpt.com') || url.includes('backend-api'))) {
+        console.log(`[FetchHandler] DEBUG: Saw request to: ${url}`);
+      }
+
       // Check if ANY provider matches this URL
       const activeProvider = self.providerRegistry.getActiveProvider();
       const isConversationEndpoint = activeProvider && activeProvider.getURLMatcher().isConversationEndpoint(url);
@@ -96,29 +101,48 @@ export class FetchHandler {
         (url.includes('tree=') || url.includes('rendering_mode='));
 
       // Use either pattern for conversation retrieval
-      const shouldIntercept = isClaudeConversationRetrieval || isClaudeConversationDetails;
+      const shouldInterceptClaude = isClaudeConversationRetrieval || isClaudeConversationDetails;
+
+      // Check if this is a ChatGPT conversation retrieval API request
+      const isChatGPTConversationRetrieval = typeof url === 'string' &&
+        (url.includes('chatgpt.com/backend-api/conversation/') || url.includes('/backend-api/conversation/')) &&
+        !url.includes('/completion') &&
+        !url.includes('/stream');
 
       // Debug logging for Claude API detection
       if (typeof url === 'string' && url.includes('claude.ai')) {
         console.log(`[FetchHandler] Detected Claude-related URL: ${url}`);
         console.log(`[FetchHandler]   - Is basic retrieval: ${isClaudeConversationRetrieval}`);
         console.log(`[FetchHandler]   - Is details retrieval: ${isClaudeConversationDetails}`);
-        console.log(`[FetchHandler]   - Should intercept: ${shouldIntercept}`);
+        console.log(`[FetchHandler]   - Should intercept: ${shouldInterceptClaude}`);
 
         // Extra logging if this is an API call but not matching our patterns
-        if (url.includes('/api/') && !shouldIntercept) {
+        if (url.includes('/api/') && !shouldInterceptClaude) {
           console.log(`[FetchHandler]   - This is a Claude API call but doesn't match our interception patterns`);
           console.log(`[FetchHandler]   - Expected patterns: contains /chat_conversations/ or /conversations/ (GET requests, not /completion/ or /stream/)`);
         }
       }
 
+      // Debug logging for ChatGPT API detection
+      if (typeof url === 'string' && url.includes('chatgpt.com/backend-api')) {
+        console.log(`[FetchHandler] Detected ChatGPT-related URL: ${url}`);
+        console.log(`[FetchHandler]   - Is conversation retrieval: ${isChatGPTConversationRetrieval}`);
+        console.log(`[FetchHandler]   - Should intercept: ${isChatGPTConversationRetrieval}`);
+      }
+
       // Call original fetch
       const response = await self.originalFetch.apply(this, args);
 
-      // If this was a conversation retrieval request, intercept the response
-      if (shouldIntercept) {
+      // If this was a Claude conversation retrieval request, intercept the response
+      if (shouldInterceptClaude) {
         console.log(`[FetchHandler] Processing Claude conversation retrieval for URL: ${url}`);
         return self.handleClaudeConversationRetrieval(response, url);
+      }
+
+      // If this was a ChatGPT conversation retrieval request, intercept the response
+      if (isChatGPTConversationRetrieval) {
+        console.log(`[FetchHandler] Processing ChatGPT conversation retrieval for URL: ${url}`);
+        return self.handleChatGPTConversationRetrieval(response, url);
       }
 
       if (isConversationEndpoint) {
@@ -206,6 +230,39 @@ export class FetchHandler {
       }
     } catch (error) {
       console.warn('[FetchHandler] Could not parse Claude conversation response as JSON:', error);
+    }
+
+    // Return the original response unchanged
+    return response;
+  }
+
+  /**
+   * Handle ChatGPT conversation retrieval response
+   * This intercepts API responses that contain full conversation data
+   */
+  async handleChatGPTConversationRetrieval(response, url) {
+    // Clone the response to read its body
+    const responseClone = response.clone();
+
+    try {
+      // Check if the response is JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await responseClone.json();
+
+        console.log('[FetchHandler] Intercepted ChatGPT conversation data:', data);
+
+        // Emit an event with the conversation data
+        eventBus.emit(EVENTS.CHATGPT_API_RESPONSE, {
+          responseData: data,
+          apiUrl: url,
+          timestamp: new Date().toISOString()
+        });
+
+        console.log('[FetchHandler] Emitted CHATGPT_API_RESPONSE event');
+      }
+    } catch (error) {
+      console.warn('[FetchHandler] Could not parse ChatGPT conversation response as JSON:', error);
     }
 
     // Return the original response unchanged

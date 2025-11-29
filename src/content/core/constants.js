@@ -43,6 +43,7 @@ export const EVENTS = {
   CHAT_HISTORY_CAPTURE: 'chat:history:capture',
   CHAT_HISTORY_CAPTURED: 'chat:history:captured',
   CLAUDE_API_RESPONSE: 'claude:api:response',
+  CHATGPT_API_RESPONSE: 'chatgpt:api:response',
 };
 
 /**

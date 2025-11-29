@@ -5,6 +5,7 @@
  */
 
 import { USER_CONFIG } from '../../configuration/index.js';
+import { ProviderRegistry } from '../providers/ProviderRegistry.js';
 
 export class ChatHistoryManager {
   constructor() {
@@ -22,8 +23,6 @@ export class ChatHistoryManager {
   setupResumeChatObserver() {
     // Monitor URL changes to detect when a user visits a specific conversation
     this.monitorUrlChanges();
-    // Also monitor for API requests that contain conversation data
-    this.setupNetworkInterceptor();
   }
 
   /**
@@ -38,22 +37,23 @@ export class ChatHistoryManager {
         currentUrl = window.location.href;
         console.log(`[ChatHistoryManager] URL changed to: ${currentUrl}`);
 
-        // Check if this is a Claude conversation URL
-        const claudeConversationMatch = currentUrl.match(/claude\.ai\/api\/organizations\/[\w-]+\/chat_conversations\/([a-f0-9-]+)/i);
-        if (claudeConversationMatch) {
-          const conversationId = claudeConversationMatch[1];
-          console.log(`[ChatHistoryManager] Detected Claude conversation visit: ${conversationId}`);
-          this.handleClaudeConversationVisit(conversationId);
-        } else {
-          console.log(`[ChatHistoryManager] URL is not a Claude conversation API URL, checking for page URL pattern...`);
+        // Iterate through all providers to check for conversation match
+        const providers = ProviderRegistry.getInstance().getAllProviders();
 
-          // Also check for page-level Claude conversation URLs (not API)
-          const claudePageMatch = currentUrl.match(/claude\.ai\/chat\/([a-f0-9-]+)/i);
-          if (claudePageMatch) {
-            const conversationId = claudePageMatch[1];
-            console.log(`[ChatHistoryManager] Detected Claude conversation page visit: ${conversationId}`);
-            // Don't immediately handle it - wait for the API call to retrieve the data
-            // When the page loads, it triggers an API call that we'll intercept in the NetworkInterceptor
+        for (const provider of providers) {
+          const conversationId = provider.getURLMatcher().getConversationId(currentUrl);
+
+          if (conversationId) {
+            console.log(`[ChatHistoryManager] Detected ${provider.getName()} conversation visit: ${conversationId}`);
+
+            // Dispatch to specific handler based on provider name
+            if (provider.getName() === 'claude') {
+              this.handleClaudeConversationVisit(conversationId);
+            } else if (provider.getName() === 'chatgpt') {
+              this.handleChatGPTConversationVisit(conversationId);
+            }
+
+            break; // Stop checking other providers
           }
         }
       }
@@ -61,44 +61,6 @@ export class ChatHistoryManager {
     };
 
     checkUrl();
-  }
-
-  /**
-   * Set up network interception to capture conversation data
-   */
-  setupNetworkInterceptor() {
-    // Override fetch to intercept API calls
-    const originalFetch = window.fetch;
-    const self = this;
-
-    window.fetch = function (...args) {
-      const url = args[0];
-
-      // Check if this is a Claude conversation API request
-      if (typeof url === 'string' && url.includes('claude.ai/api/') && url.includes('/chat_conversations/')) {
-        console.log(`[ChatHistoryManager] Intercepting Claude API request: ${url}`);
-
-        // Return the original fetch but with promise handling to capture response
-        return originalFetch.apply(this, args).then(async (response) => {
-          // Clone the response so we can read it
-          const responseClone = response.clone();
-
-          try {
-            const data = await responseClone.json();
-            console.log(`[ChatHistoryManager] Intercepted Claude conversation data:`, data);
-
-            // Process and store the conversation data
-            self.captureClaudeConversationData(data, url);
-          } catch (e) {
-            console.log(`[ChatHistoryManager] Could not parse response as JSON: ${e.message}`);
-          }
-
-          return response;
-        });
-      }
-
-      return originalFetch.apply(this, args);
-    };
   }
 
   /**
@@ -259,6 +221,108 @@ export class ChatHistoryManager {
     }
 
     return [];
+  }
+  /**
+   * Handle when a ChatGPT conversation URL is visited
+   * @param {string} conversationId - The ID of the conversation
+   */
+  async handleChatGPTConversationVisit(conversationId) {
+    console.log(`[ChatHistoryManager] Handling ChatGPT conversation visit for ID: ${conversationId}`);
+
+    // Reset the captured flag if this is a NEW conversation
+    if (this.currentConversationId !== conversationId) {
+      console.log(`[ChatHistoryManager] NEW conversation detected (was: ${this.currentConversationId}, now: ${conversationId}). Resetting capture flag.`);
+      this.currentConversationId = conversationId;
+    }
+
+    // We'll wait for the API call to retrieve the conversation data
+    // The data should be captured by our network interceptor
+    console.log(`[ChatHistoryManager] Waiting for API call for conversation ${conversationId}`);
+  }
+
+  /**
+   * Capture and store ChatGPT conversation data from API response
+   * @param {Object} data - Raw ChatGPT API conversation object
+   * @param {string} url - The URL from which this data was retrieved
+   * @returns {Object} The created entry
+   */
+  captureChatGPTConversationData(data, url) {
+    console.log('[ChatHistoryManager] Capturing ChatGPT conversation data from API response');
+
+    const conversationId = data.conversation_id || 'unknown';
+
+    console.log(`[ChatHistoryManager] Processing conversation ID: ${conversationId}`);
+
+    // Extract model and clean messages
+    const model = data.default_model_slug || 'gpt-4';
+    const conversationMessages = this.extractChatGPTMessages(data.mapping || {});
+
+    const formattedData = {
+      model: model,
+      session_id: conversationId,
+      conversation_id: conversationId,
+      conversation_messages: conversationMessages,
+      platform: 'ChatGPT'
+    };
+
+    const entry = this.createEntry(formattedData);
+
+    console.log(`[ChatHistoryManager] ChatGPT conversation data captured with ID: ${conversationId}`);
+    console.log(`[ChatHistoryManager] Stored conversation:`, entry);
+
+    return entry;
+  }
+
+  /**
+   * Extract messages from ChatGPT mapping structure
+   * @param {Object} mapping - The mapping object from ChatGPT API
+   * @returns {Array} Simplified chat_messages with only role, text, message_id
+   */
+  extractChatGPTMessages(mapping) {
+    const messages = [];
+
+    // Traverse the mapping to extract messages in order
+    // Start from the root and follow the children chain
+    const processNode = (nodeId) => {
+      const node = mapping[nodeId];
+      if (!node || !node.message) return;
+
+      const message = node.message;
+      const role = message.author?.role;
+
+      // Only include user and assistant messages (skip system messages)
+      if (role === 'user' || role === 'assistant') {
+        // Extract text from content.parts
+        let text = '';
+        if (message.content?.parts && Array.isArray(message.content.parts)) {
+          text = message.content.parts.join('\n');
+        } else if (message.content?.content_type === 'text' && message.content?.parts) {
+          text = message.content.parts.join('\n');
+        }
+
+        // Only add if we have actual text content
+        if (text && text.trim().length > 0) {
+          messages.push({
+            role: role,
+            text: text,
+            message_id: message.id
+          });
+        }
+      }
+
+      // Process children recursively
+      if (node.children && Array.isArray(node.children)) {
+        node.children.forEach(childId => processNode(childId));
+      }
+    };
+
+    // Start from the root node
+    if (mapping['client-created-root']) {
+      processNode('client-created-root');
+    }
+
+    console.log(`[ChatHistoryManager] Extracted ${messages.length} messages from ChatGPT conversation`);
+    return messages;
   }
 
   /**

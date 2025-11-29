@@ -27,6 +27,12 @@ export class EventIntegration {
       this.handleClaudeApiResponse(data);
     });
 
+    // Listen for ChatGPT-specific events
+    this.eventBus.on('CHATGPT_API_RESPONSE', (data) => {
+      console.log('[EventIntegration] Received CHATGPT_API_RESPONSE event:', data);
+      this.handleChatGPTApiResponse(data);
+    });
+
     // Listen for general chat events
     this.eventBus.on('CHAT_HISTORY_CAPTURE', (data) => {
       console.log('[EventIntegration] Received CHAT_HISTORY_CAPTURE event:', data);
@@ -43,7 +49,7 @@ export class EventIntegration {
    */
   handleConversationResume(data) {
     console.log(`[EventIntegration] Handling conversation resume for platform: ${data.platform || 'unknown'}`);
-    
+
     // Call the appropriate capture method based on the platform
     if (data.platform === 'Claude') {
       // For Claude, we might need to fetch the conversation data first
@@ -60,9 +66,20 @@ export class EventIntegration {
    */
   handleClaudeApiResponse(data) {
     console.log('[EventIntegration] Handling Claude API response:', data);
-    
+
     // Capture the Claude conversation data
     this.chatHistoryManager.captureClaudeConversationData(data.responseData, data.apiUrl);
+  }
+
+  /**
+   * Handle ChatGPT API response event
+   * @param {Object} data - Event data containing ChatGPT API response
+   */
+  handleChatGPTApiResponse(data) {
+    console.log('[EventIntegration] Handling ChatGPT API response:', data);
+
+    // Capture the ChatGPT conversation data
+    this.chatHistoryManager.captureChatGPTConversationData(data.responseData, data.apiUrl);
   }
 
   /**
@@ -71,7 +88,7 @@ export class EventIntegration {
    */
   captureChatHistory(data) {
     console.log('[EventIntegration] Capturing chat history via event system:', data);
-    
+
     const entry = this.chatHistoryManager.createEntry({
       agent: data.agent || {},
       user: data.user || {},
@@ -80,7 +97,7 @@ export class EventIntegration {
       platform: data.platform || 'unknown',
       ...data
     });
-    
+
     // Emit an event to notify other components that chat history was captured
     this.eventBus.emit('CHAT_HISTORY_CAPTURED', {
       entryId: entry.id,
@@ -88,7 +105,7 @@ export class EventIntegration {
       platform: entry.platform,
       timestamp: entry.created_at
     });
-    
+
     console.log('[EventIntegration] Chat history captured and event emitted:', entry);
   }
 }
