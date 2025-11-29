@@ -82,21 +82,20 @@ export class FetchHandler {
       }
 
       // Check if this is a Claude conversation retrieval API request
-      // More generic pattern to catch any Claude API call that might contain conversation data
+      // Pattern 1: Basic retrieval - any GET request to /chat_conversations/{id} (not completion/stream)
       const isClaudeConversationRetrieval = typeof url === 'string' &&
-                                           url.includes('claude.ai/api/') &&
-                                           (url.includes('/chat_conversations/') || url.includes('/conversations/')) &&
-                                           !url.includes('/completion') &&
-                                           !url.includes('/stream');
+        url.includes('claude.ai/api/') &&
+        (url.includes('/chat_conversations/') || url.includes('/conversations/')) &&
+        !url.includes('/completion') &&
+        !url.includes('/stream');
 
-      // More specific pattern for Claude conversation details API
+      // Pattern 2: More specific pattern for conversation details API with query params
       const isClaudeConversationDetails = typeof url === 'string' &&
-                                         url.includes('claude.ai/api/') &&
-                                         url.includes('/chat_conversations/') &&
-                                         url.includes('tree=True') &&
-                                         url.includes('rendering_mode=messages');
+        url.includes('claude.ai/api/') &&
+        url.includes('/chat_conversations/') &&
+        (url.includes('tree=') || url.includes('rendering_mode='));
 
-      // Use the more specific pattern for conversation retrieval
+      // Use either pattern for conversation retrieval
       const shouldIntercept = isClaudeConversationRetrieval || isClaudeConversationDetails;
 
       // Debug logging for Claude API detection
@@ -109,7 +108,7 @@ export class FetchHandler {
         // Extra logging if this is an API call but not matching our patterns
         if (url.includes('/api/') && !shouldIntercept) {
           console.log(`[FetchHandler]   - This is a Claude API call but doesn't match our interception patterns`);
-          console.log(`[FetchHandler]   - Expected patterns: contains /chat_conversations/ or /conversations/, with tree=True and rendering_mode=messages, but not /completion/ or /stream/`);
+          console.log(`[FetchHandler]   - Expected patterns: contains /chat_conversations/ or /conversations/ (GET requests, not /completion/ or /stream/)`);
         }
       }
 

@@ -38,6 +38,8 @@ import {
   handleClaudeApiResponse,
 } from './chatHistoryHandlers.js';
 
+import { handleImportChat } from './chatImportHandlers.js';
+
 /**
  * Handler Registry
  * Maps event names to their corresponding handler functions
@@ -70,8 +72,6 @@ export const HANDLER_REGISTRY = {
   [EVENTS.API_SYNC_COMPLETE]: handleAPISyncComplete,
   [EVENTS.API_SYNC_ERROR]: handleAPISyncError,
 
-  // Chat History events
-  [EVENTS.CONVERSATION_RESUME]: handleConversationResume,
-  [EVENTS.CHAT_HISTORY_CAPTURE]: handleChatHistoryCapture,
-  [EVENTS.CLAUDE_API_RESPONSE]: handleClaudeApiResponse,
+  // Chat Import events (only settings-triggered import)
+  'import:chat': handleImportChat,
 };

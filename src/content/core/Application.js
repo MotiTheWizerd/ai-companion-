@@ -15,6 +15,7 @@ import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider
 import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
 import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
 import { ToolbarController } from '../../modules/UIControls/index.js';
+import { ChatImportManager } from '../../modules/ChatImportManager/ChatImportManager.js';
 
 import { APIClient } from '../../modules/APIClient/index.js';
 import { API_CONFIG } from './constants.js';
@@ -31,8 +32,12 @@ export class Application {
     // Initialize provider registry and set active provider
     this.initializeProviders();
 
+    // Initialize Universal Chat History module
+    this.chatHistoryManager = new UniversalChatHistory();
+    this.eventIntegration = new EventIntegration(this.chatHistoryManager, eventBus);
+
     // Initialize UI Controllers
-    this.toolbarController = new ToolbarController(this.conversationManager);
+    this.toolbarController = new ToolbarController(this.conversationManager, this.chatHistoryManager);
 
     // Initialize API Client for making backend requests
     this.apiClient = new APIClient({
@@ -43,10 +48,6 @@ export class Application {
       maxConcurrent: API_CONFIG.MAX_CONCURRENT,
     });
 
-    // Initialize Universal Chat History module
-    this.chatHistoryManager = new UniversalChatHistory();
-    this.eventIntegration = new EventIntegration(this.chatHistoryManager, eventBus);
-
     // Create managers object for dependency injection
     this.managers = {
       conversationManager: this.conversationManager,
@@ -54,6 +55,10 @@ export class Application {
       storageManager: this.storageManager,
       chatHistoryManager: this.chatHistoryManager, // Add to managers for event handlers
     };
+
+    // Initialize Chat Import manager (after managers created)
+    this.chatImportManager = new ChatImportManager({ managers: this.managers });
+    this.managers.chatImportManager = this.chatImportManager;
   }
 
   /**

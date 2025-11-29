@@ -35,6 +35,11 @@ export const ENDPOINTS = {
       method: 'DELETE',
       description: 'Delete conversation',
     },
+    RAW_IMPORT: {
+      path: '/conversations/raw',
+      method: 'POST',
+      description: 'Import raw conversation data',
+    },
   },
 
   // Message endpoints

@@ -1,13 +1,18 @@
 /**
  * ChatHistoryManager
- * Manages chat history with created_at, agent, user fields
+ * Manages chat history in memory (no localStorage persistence)
+ * Conversations are captured and emitted for backend storage
  */
+
+import { USER_CONFIG } from '../../configuration/index.js';
 
 export class ChatHistoryManager {
   constructor() {
-    this.storageKey = 'universal_chat_history';
-    this.entries = this.loadFromStorage();
+    this.entries = []; // In-memory storage only
     this.resumedChatObserver = null;
+    this.capturedConversations = new Set(); // Track which conversation IDs have been captured
+    this.capturedCallbacks = []; // Callbacks to notify when conversation is captured
+    this.currentConversationId = null; // Track current conversation ID
   }
 
   /**
@@ -66,7 +71,7 @@ export class ChatHistoryManager {
     const originalFetch = window.fetch;
     const self = this;
 
-    window.fetch = function(...args) {
+    window.fetch = function (...args) {
       const url = args[0];
 
       // Check if this is a Claude conversation API request
@@ -103,6 +108,13 @@ export class ChatHistoryManager {
   async handleClaudeConversationVisit(conversationId) {
     console.log(`[ChatHistoryManager] Handling Claude conversation visit for ID: ${conversationId}`);
 
+    // Reset the captured flag if this is a NEW conversation
+    if (this.currentConversationId !== conversationId) {
+      console.log(`[ChatHistoryManager] NEW conversation detected (was: ${this.currentConversationId}, now: ${conversationId}). Resetting capture flag.`);
+      this.currentConversationId = conversationId;
+      // No longer using `conversationCaptured` flag, relying on `capturedConversations` Set
+    }
+
     // Extract the organization ID from the URL as well
     const orgMatch = window.location.href.match(/claude\.ai\/api\/organizations\/([\w-]+)/i);
     const orgId = orgMatch ? orgMatch[1] : 'unknown';
@@ -113,43 +125,63 @@ export class ChatHistoryManager {
   }
 
   /**
-   * Capture Claude conversation data from API response
-   * @param {Object} data - The conversation data from the API
-   * @param {string} url - The API URL that returned the data
+   * Capture and store Claude conversation data from API response
+   * @param {Object} data - Raw Claude API conversation object
+   * @param {string} url - The URL from which this data was retrieved
+   * @returns {Object} The created entry
    */
   captureClaudeConversationData(data, url) {
-    console.log(`[ChatHistoryManager] Capturing Claude conversation data from API response`);
-    console.log(`[ChatHistoryManager] API URL: ${url}`);
-    console.log(`[ChatHistoryManager] Conversation data:`, data);
+    console.log('[ChatHistoryManager] Capturing Claude conversation data from API response');
 
-    // Extract conversation ID from the URL
-    const conversationIdMatch = url.match(/chat_conversations\/([a-f0-9-]+)/i);
-    const conversationId = conversationIdMatch ? conversationIdMatch[1] : 'unknown';
+    const conversationId = data.uuid || 'unknown';
 
-    // Format the data according to our structure
+    console.log(`[ChatHistoryManager] Processing conversation ID: ${conversationId}`);
+
+    // Extract model and clean messages
+    const model = this.extractModelFromData(data) || 'claude';
+    const conversationMessages = this.cleanChatMessages(data.chat_messages || []);
+
     const formattedData = {
-      agent: {
-        name: 'Claude',
-        provider: 'Anthropic',
-        model: this.extractModelFromData(data) || 'unknown'
-      },
-      user: {
-        id: this.extractUserIdFromData(data) || 'unknown',
-        preferences: {}
-      },
-      messages: this.extractMessagesFromData(data) || [],
+      model: model,
+      session_id: conversationId,
       conversation_id: conversationId,
-      platform: 'Claude',
-      raw_data: data, // Keep the raw data for potential future use
-      url: url
+      conversation_messages: conversationMessages,
+      platform: 'Claude'
     };
 
     const entry = this.createEntry(formattedData);
 
-    console.log(`[ChatHistoryManager] Claude conversation data captured with ID: ${entry.id}`);
+    console.log(`[ChatHistoryManager] Claude conversation data captured with ID: ${conversationId}`);
     console.log(`[ChatHistoryManager] Stored conversation:`, entry);
 
     return entry;
+  }
+
+  /**
+   * Clean chat_messages array and transform to simplified format
+   * @param {Array} messages - Raw chat_messages from Claude API
+   * @returns {Array} Simplified chat_messages with only role, text, message_id
+   */
+  cleanChatMessages(messages) {
+    return messages.map((msg, index) => {
+      // Extract text from content array
+      let text = msg.text || '';
+      if (Array.isArray(msg.content)) {
+        const textBlocks = msg.content.filter(c => c.type === 'text');
+        text = textBlocks.map(block => block.text).join('\n');
+      }
+
+      // Determine role based on position
+      // First message (parent_message_uuid all zeros) is user, then alternates
+      const isFirstMessage = msg.parent_message_uuid === '00000000-0000-4000-8000-000000000000';
+      const role = (isFirstMessage || index % 2 === 0) ? 'user' : 'assistant';
+
+      return {
+        role: role,
+        text: text,
+        message_id: msg.uuid
+      };
+    });
   }
 
   /**
@@ -192,7 +224,31 @@ export class ChatHistoryManager {
    * @returns {Array|null} Array of messages or null if not found
    */
   extractMessagesFromData(data) {
-    // Implementation will depend on the actual structure of Claude API response
+    // Claude API uses 'chat_messages' field
+    if (data && Array.isArray(data.chat_messages)) {
+      return data.chat_messages.map(msg => {
+        // Extract text from content array (Claude's format)
+        let text = '';
+        if (Array.isArray(msg.content)) {
+          // Find text content blocks
+          const textBlocks = msg.content.filter(c => c.type === 'text');
+          text = textBlocks.map(block => block.text).join('\n');
+        } else if (msg.text) {
+          text = msg.text;
+        } else if (msg.content) {
+          text = msg.content;
+        }
+
+        return {
+          id: msg.uuid || msg.id || 'unknown',
+          role: msg.sender || msg.role || 'unknown',
+          text: text || 'No content',
+          timestamp: msg.created_at || msg.timestamp || new Date().toISOString()
+        };
+      });
+    }
+
+    // Fallback: check for other possible field names
     if (data && Array.isArray(data.messages)) {
       return data.messages.map(msg => ({
         id: msg.id || 'unknown',
@@ -201,37 +257,66 @@ export class ChatHistoryManager {
         timestamp: msg.created_at || msg.timestamp || new Date().toISOString()
       }));
     }
-    // If messages are nested in conversation metadata, handle that:
-    if (data && data.conversation && Array.isArray(data.conversation.messages)) {
-      return data.conversation.messages.map(msg => ({
-        id: msg.id || 'unknown',
-        role: msg.role || 'unknown',
-        text: msg.text || msg.content || 'No content',
-        timestamp: msg.created_at || msg.timestamp || new Date().toISOString()
-      }));
-    }
+
     return [];
   }
 
   /**
+   * Register a callback to be notified when a conversation is captured
+   * @param {Function} callback - Function to be called when conversation is captured
+   */
+  onConversationCaptured(callback) {
+    this.capturedCallbacks.push(callback);
+  }
+
+  /**
+   * Notify all registered callbacks that a conversation has been captured
+   * @param {Object} entry - The captured conversation entry with id and conversation_id
+   */
+  notifyConversationCaptured(entry) {
+    const conversationId = entry.conversation_id || entry.id;
+
+    // Only notify if this is a new conversation we haven't captured before
+    if (!this.capturedConversations.has(conversationId)) {
+      this.capturedConversations.add(conversationId);
+      console.log(`[ChatHistoryManager] New conversation captured: ${conversationId}`);
+
+      // Call all registered callbacks with the entry data
+      this.capturedCallbacks.forEach(callback => {
+        try {
+          callback(entry);
+        } catch (error) {
+          console.error('[ChatHistoryManager] Error in conversation captured callback:', error);
+        }
+      });
+    } else {
+      console.log(`[ChatHistoryManager] Conversation ${conversationId} already captured, skipping notification`);
+    }
+  }
+
+  /**
    * Create a new chat history entry
-   * @param {Object} data - Chat data containing agent, user, and messages
-   * @returns {Object} The created entry with id and timestamp
+   * @param {Object} data - Chat data containing model, session_id, user_id, and conversation_messages
+   * @returns {Object} The created entry
    */
   createEntry(data) {
     const entry = {
-      id: this.generateId(),
-      created_at: new Date().toISOString(),
-      agent: data.agent || {},
-      user: data.user || {},
-      messages: data.messages || [],
-      conversation_id: data.conversation_id || null,
-      platform: data.platform || 'unknown',
-      ...data
+      user_id: data.user_id || USER_CONFIG?.USER_ID || 'unknown',
+      project_id: 'eb75e102-be0a-4b4b-a7ce-59fcab03fc0d',
+      model: data.model || data.agent || 'claude',
+      session_id: data.session_id || data.conversation_id || null,
+      conversation_id: data.session_id || data.conversation_id || null, // Add conversation_id as requested
+      conversation_messages: data.conversation_messages || []
     };
 
     this.entries.push(entry);
     this.saveToStorage();
+
+    // Notify listeners if this is a Claude conversation
+    if (data.platform === 'Claude' || data.model || data.agent) {
+      this.notifyConversationCaptured(entry);
+    }
+
     return entry;
   }
 
@@ -271,7 +356,7 @@ export class ChatHistoryManager {
       created_at: this.entries[index].created_at // Preserve original creation time
     };
 
-    this.saveToStorage();
+    // Storage disabled - kept in memory only
     return this.entries[index];
   }
 
@@ -285,7 +370,7 @@ export class ChatHistoryManager {
     this.entries = this.entries.filter(entry => entry.id !== id);
 
     if (this.entries.length !== initialLength) {
-      this.saveToStorage();
+      // Storage disabled - kept in memory only
       return true;
     }
 
@@ -309,27 +394,21 @@ export class ChatHistoryManager {
   }
 
   /**
-   * Save entries to storage
+   * saveToStorage - Deprecated
+   * Conversations are now kept in memory only
    */
   saveToStorage() {
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.entries));
-    } catch (error) {
-      console.error('[ChatHistoryManager] Error saving to storage:', error);
-    }
+    // No-op: localStorage persistence disabled to avoid quota errors
+    // Conversations are emitted via events for backend storage
   }
 
   /**
-   * Load entries from storage
-   * @returns {Array} Array of chat history entries
+   * loadFromStorage - Deprecated
+   * Returns empty array as all storage is in-memory now
+   * @returns {Array} Empty array
    */
   loadFromStorage() {
-    try {
-      const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
-      console.error('[ChatHistoryManager] Error loading from storage:', error);
-      return [];
-    }
+    // No-op: localStorage persistence disabled
+    return [];
   }
 }

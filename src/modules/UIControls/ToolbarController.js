@@ -1,20 +1,34 @@
 import { HeaderToolbar } from '../SemantixUIComponents/index.js';
+import { eventBus } from '../../content/core/eventBus.js';
 
 /**
  * Controls the injection and management of the toolbar.
  * The toolbar is injected into the <body> element and positioned fixed at the top center.
  */
 export class ToolbarController {
-    constructor(conversationManager) {
+    constructor(conversationManager, chatHistoryManager) {
         this.conversationManager = conversationManager;
+        this.chatHistoryManager = chatHistoryManager;
         this.observer = null;
         this.isInitialized = false;
         this.retryCount = 0;
+        this.toolbarElement = null; // Store reference to toolbar element
     }
 
     init() {
         if (this.isInitialized) return;
         console.log('[ToolbarController] Initialized');
+
+        // Register callback early to catch conversations detected after init
+        if (this.chatHistoryManager) {
+            this.chatHistoryManager.onConversationCaptured((claudeData) => {
+                console.log('[ToolbarController] onConversationCaptured callback triggered with data');
+                this.showSettingsIcon();
+                // Automatic import removed as per user request.
+                // Import is now triggered only via settings icon click.
+            });
+        }
+
         this.startObserver();
         this.isInitialized = true;
     }
@@ -69,24 +83,17 @@ export class ToolbarController {
     }
 
     injectToolbar(targetElement, position) {
-        const toolbarHtml = HeaderToolbar();
+        // Create toolbar without settings icon initially
+        const toolbarHtml = this.getHeaderToolbarHTML(false); // Don't show settings icon initially
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolbarHtml;
         const toolbarElement = tempDiv.firstElementChild;
+        this.toolbarElement = toolbarElement;
 
-        // Add click event to settings icon
-        const settingsIcon = toolbarElement.querySelector('.semantix-settings-icon');
-        if (settingsIcon) {
-            settingsIcon.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                console.log('[ToolbarController] Settings icon clicked');
+        // Store reference to status text element to update it later
+        this.statusTextElement = toolbarElement.querySelector('.semantix-status-text');
 
-                // Create a simple settings popup or trigger settings functionality
-                this.openSettings();
-            });
-        }
-
+        // Add click event to settings icon (will be added later when needed)
         // Styles are now handled by CSS class .semantix-header-toolbar
 
         // Insert according to requested position (append works for body)
@@ -100,14 +107,87 @@ export class ToolbarController {
             targetElement.appendChild(toolbarElement);
         }
 
-        console.log('[ToolbarController] Toolbar injected');
+        console.log('[ToolbarController] Toolbar injected (without settings icon initially)');
+
+        // Note: callback for showing settings icon is now registered in init()
+        // to ensure it catches conversations detected early
+    }
+
+    /**
+     * Get HTML for the header toolbar
+     * @param {boolean} showSettingsIcon - Whether to include the settings icon
+     * @returns {string} HTML string for the toolbar
+     */
+    getHeaderToolbarHTML(showSettingsIcon) {
+        if (showSettingsIcon) {
+            return `
+                <div class='semantix-header-toolbar'>
+                    <span class="semantix-status-dot"></span>
+                    <span class="semantix-status-text">Active</span>
+                    <span class="semantix-settings-icon">⚙️</span>
+                </div>
+            `;
+        } else {
+            return `
+                <div class='semantix-header-toolbar'>
+                    <span class="semantix-status-dot"></span>
+                    <span class="semantix-status-text">Monitoring</span>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Show the settings icon in the toolbar after conversation is captured
+     */
+    showSettingsIcon() {
+        console.log('[ToolbarController] Showing settings icon after conversation capture');
+
+        if (this.toolbarElement) {
+            // Update the status text
+            if (this.statusTextElement) {
+                this.statusTextElement.textContent = 'Active';
+                this.statusTextElement.className = 'semantix-status-text active';
+            }
+
+            // Check if settings icon already exists
+            const existingIcon = this.toolbarElement.querySelector('.semantix-settings-icon');
+            if (existingIcon) {
+                console.log('[ToolbarController] Settings icon already exists, skipping');
+                return;
+            }
+
+            // Add the settings icon to the existing toolbar
+            const settingsIcon = document.createElement('span');
+            settingsIcon.className = 'semantix-settings-icon';
+            settingsIcon.textContent = '⚙️';
+
+            // Add click event to settings icon
+            settingsIcon.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                console.log('[ToolbarController] Settings icon clicked');
+
+                // Create a simple settings popup or trigger settings functionality
+                this.openSettings();
+            });
+
+            // Add the settings icon to the toolbar
+            this.toolbarElement.appendChild(settingsIcon);
+            console.log('[ToolbarController] Settings icon added to toolbar');
+        }
     }
 
     openSettings() {
         // Create a simple settings modal or trigger settings functionality
         console.log('[ToolbarController] Opening settings');
 
-        // For now, we'll just show an alert - in the future this could open a more complex UI
-        alert('Semantix Bridge Settings\n\nStatus: Active\nFeatures: Memory Injection, Conversation Sync');
+        // Emit event to trigger chat import flow after settings opened
+        try {
+            eventBus.emit('import:chat', { source: 'toolbar-settings' });
+            console.log('[ToolbarController] Emitted event "import:chat"');
+        } catch (err) {
+            console.error('[ToolbarController] Failed to emit import:chat event', err);
+        }
     }
 }
