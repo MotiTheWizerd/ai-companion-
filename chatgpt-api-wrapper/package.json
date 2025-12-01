@@ -1,0 +1,18 @@
+{
+    "name": "chatgpt-api-wrapper",
+    "version": "1.0.0",
+    "description": "Standalone ChatGPT API wrapper with memory injection",
+    "main": "src/index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "node --watch src/index.js",
+        "test": "node test-puppeteer.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "node-fetch": "^3.3.2",
+        "dotenv": "^16.3.1",
+        "puppeteer": "^21.6.1"
+    }
+}

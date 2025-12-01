@@ -4,7 +4,7 @@
 export const CHATGPT_CONFIG = {
   name: 'ChatGPT',
   domain: 'chatgpt.com',
-  projectId: '11', // Default project ID for ChatGPT
+  // Note: projectId is now retrieved dynamically from storage via getProjectId() method
   endpoints: {
     conversation: '/conversation',
   },

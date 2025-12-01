@@ -16,9 +16,7 @@
     "48": "icons/icon48.svg",
     "128": "icons/icon128.svg"
   },
-  "permissions": [
-    "storage"
-  ],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://claude.ai/*",
@@ -31,9 +29,7 @@
         "https://claude.ai/*",
         "https://chat.qwen.ai/*"
       ],
-      "js": [
-        "src/loader.js"
-      ],
+      "js": ["src/loader.js"],
       "run_at": "document_start"
     }
   ],
@@ -47,6 +43,8 @@
         "src/content/modules/utils/*.js",
         "src/modules/*.js",
         "src/modules/*/*.js",
+        "src/modules/*/*/*.js",
+        "src/modules/*/*/*/*.js",
         "src/modules/providers/*/*.js",
         "src/modules/UIControls/styles.css"
       ],

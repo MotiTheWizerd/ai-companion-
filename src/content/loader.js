@@ -5,6 +5,7 @@
  */
 
 console.log('[Loader] Content script starting on:', window.location.href);
+console.log('[Loader] VERSION CHECK: 2025-11-30 T 08:10');
 
 // Inject main application script into page context
 (function () {

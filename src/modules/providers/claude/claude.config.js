@@ -4,7 +4,7 @@
 export const CLAUDE_CONFIG = {
   name: 'Claude',
   domain: 'claude.ai',
-  projectId: '12', // Separate project ID for Claude (GPT uses '11')
+  // Note: projectId is now retrieved dynamically from storage via getProjectId() method
   endpoints: {
     conversation: '/api/organizations',
   },

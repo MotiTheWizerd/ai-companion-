@@ -3,6 +3,7 @@ import { ClaudeStreamParser } from './ClaudeStreamParser.js';
 import { ClaudeURLMatcher } from './ClaudeURLMatcher.js';
 import { CLAUDE_CONFIG } from './claude.config.js';
 import { API_CONFIG } from '../../../content/core/constants.js';
+import { getProjectIdFromStorage } from '../../../content/modules/utils/storageUtils.js';
 
 /**
  * Claude provider implementation
@@ -149,5 +150,13 @@ export class ClaudeProvider extends BaseProvider {
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * Get project ID dynamically from storage
+   * @returns {Promise<string|null>} Project ID or null if not available
+   */
+  async getProjectId() {
+    return await getProjectIdFromStorage();
   }
 }

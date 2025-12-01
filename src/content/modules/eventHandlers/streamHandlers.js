@@ -93,58 +93,67 @@ export function handleStreamComplete(data, managers) {
   // Get active provider and its projectId
   const providerRegistry = ProviderRegistry.getInstance();
   const activeProvider = providerRegistry.getActiveProvider();
-  const projectId = activeProvider?.providerConfig?.projectId;
 
-  if (!projectId) {
-    Logger.api('Skipping sync: no projectId available from active provider');
+  if (!activeProvider || !activeProvider.getProjectId) {
+    Logger.api('Skipping sync: no active provider or getProjectId method available');
     return;
   }
 
-  // Create payload with only the latest exchange
-  const syncPayload = {
-    conversation_id: fullConversation.conversation_id,
-    session_id: fullConversation.conversation_id, // Session ID (same as conversation_id)
-    model: fullConversation.model,
-    project_id: projectId, // Provider-specific project ID
-    conversation: [lastUserMessage, lastAssistantMessage]
-  };
-
-  // Send conversation to background script for API sync
-  // Uses window.postMessage to communicate with content script (loader.js)
-  // which forwards to background service worker
-  Logger.api('Sending latest exchange to background for sync');
-
-  // Post message to content script (message bridge)
-  window.postMessage({
-    source: 'chatgpt-extension',
-    type: 'SYNC_CONVERSATION',
-    data: syncPayload
-  }, '*');
-
-  // Listen for response from background (via content script)
-  const handleResponse = (event) => {
-    // Only accept messages from same origin
-    if (event.source !== window) return;
-
-    // Filter response messages
-    if (!event.data || event.data.source !== 'chatgpt-extension-response') return;
-    if (event.data.type !== 'SYNC_CONVERSATION') return;
-
-    // Remove listener after receiving response
-    window.removeEventListener('message', handleResponse);
-
-    if (event.data.success) {
-      Logger.api(`Sync successful: ${fullConversation.conversation_id}`);
-    } else {
-      Logger.api(`Sync failed: ${event.data.error || 'Unknown error'}`);
+  // Get project ID dynamically from provider using Promise
+  activeProvider.getProjectId().then(projectId => {
+    if (!projectId) {
+      Logger.api('Skipping sync: no projectId available from active provider');
+      return;
     }
-  };
 
-  window.addEventListener('message', handleResponse);
+    // Create payload with only the latest exchange
+    const syncPayload = {
+      conversation_id: fullConversation.conversation_id,
+      session_id: fullConversation.conversation_id, // Session ID (same as conversation_id)
+      model: fullConversation.model,
+      project_id: projectId, // Provider-specific project ID
+      conversation: [lastUserMessage, lastAssistantMessage]
+    };
 
-  // Cleanup listener after timeout (30 seconds)
-  setTimeout(() => {
-    window.removeEventListener('message', handleResponse);
-  }, 30000);
+    // Send conversation to background script for API sync
+    // Uses window.postMessage to communicate with content script (loader.js)
+    // which forwards to background service worker
+    Logger.api('Sending latest exchange to background for sync');
+
+    // Post message to content script (message bridge)
+    window.postMessage({
+      source: 'chatgpt-extension',
+      type: 'SYNC_CONVERSATION',
+      data: syncPayload
+    }, '*');
+
+    // Listen for response from background (via content script)
+    const handleResponse = (event) => {
+      // Only accept messages from same origin
+      if (event.source !== window) return;
+
+      // Filter response messages
+      if (!event.data || event.data.source !== 'chatgpt-extension-response') return;
+      if (event.data.type !== 'SYNC_CONVERSATION') return;
+
+      // Remove listener after receiving response
+      window.removeEventListener('message', handleResponse);
+
+      if (event.data.success) {
+        Logger.api(`Sync successful: ${fullConversation.conversation_id}`);
+      } else {
+        Logger.api(`Sync failed: ${event.data.error || 'Unknown error'}`);
+      }
+    };
+
+    window.addEventListener('message', handleResponse);
+
+    // Cleanup listener after timeout (30 seconds)
+    setTimeout(() => {
+      window.removeEventListener('message', handleResponse);
+    }, 30000);
+  }).catch(error => {
+    Logger.api('Error getting project ID:', error);
+  });
 }
 

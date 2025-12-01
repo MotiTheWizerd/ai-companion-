@@ -7,6 +7,7 @@ import { eventBus } from '../../../content/core/eventBus.js';
 import { EVENTS, API_CONFIG } from '../../../content/core/constants.js';
 import { Logger } from '../../../content/modules/utils/logger.js';
 import { ProviderRegistry } from '../../providers/ProviderRegistry.js';
+import { getProjectIdFromStorage } from '../../../content/modules/utils/storageUtils.js';
 
 /**
  * EventListenerManager class
@@ -44,16 +45,15 @@ export class EventListenerManager {
    * Sync conversation to backend
    * Transforms conversation data to match backend API format
    * @param {Object} conversationData - Conversation data from STREAM_COMPLETE event
-   * @returns {string} - Request ID
+   * @returns {Promise<string>} - Request ID
    */
-  syncConversation(conversationData) {
+  async syncConversation(conversationData) {
     // Get project_id from conversationData (preferred) or from active provider
     let projectId = conversationData.project_id;
 
     if (!projectId) {
-      const providerRegistry = ProviderRegistry.getInstance();
-      const activeProvider = providerRegistry.getActiveProvider();
-      projectId = activeProvider?.providerConfig?.projectId;
+      // Try to get project ID from storage
+      projectId = await getProjectIdFromStorage();
     }
 
     if (!projectId) {
