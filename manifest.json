@@ -46,7 +46,10 @@
         "src/modules/*/*/*.js",
         "src/modules/*/*/*/*.js",
         "src/modules/providers/*/*.js",
-        "src/modules/UIControls/styles.css"
+        "src/modules/UIControls/styles.css",
+        "src/ui/components/*.js",
+        "src/ui/components/*/*.js",
+        "src/ui/components/*/*/*.js"
       ],
       "matches": [
         "https://chatgpt.com/*",

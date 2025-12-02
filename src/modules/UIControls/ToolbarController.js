@@ -22,6 +22,7 @@ export class ToolbarController {
     this.projectBridgeResolvers = [];
     this.bridgeRequestPending = false;
     this.projectBridgeHandler = null;
+    this.storageWarningLogged = false;
   }
 
   init() {
@@ -261,9 +262,12 @@ export class ToolbarController {
 
   registerStorageListener() {
     if (!this.canUseChromeStorage()) {
-      console.warn(
-        "[ToolbarController] chrome.storage not available, using loader bridge",
-      );
+      if (!this.storageWarningLogged) {
+        console.info(
+          "[ToolbarController] chrome.storage not available, using loader bridge",
+        );
+        this.storageWarningLogged = true;
+      }
       this.setupProjectBridgeChannel();
       return;
     }

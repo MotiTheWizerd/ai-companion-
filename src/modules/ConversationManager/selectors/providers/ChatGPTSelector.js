@@ -56,7 +56,12 @@ export class ChatGPTSelector {
    * @returns {string|null} CSS selector
    */
   getWidgetContainer() {
-    return "#thread-bottom .flex.justify-center.empty\\:hidden";
+    return [
+      "#thread-bottom .flex.justify-center.empty\\:hidden",
+      "#thread-bottom .flex.justify-center",
+      "#thread-bottom .text-base.mx-auto",
+      "#thread-bottom"
+    ];
   }
 
   /**

@@ -28,6 +28,7 @@ export class Application {
     this.conversationManager = new ConversationManager();
     this.messageManager = new MessageManager();
     this.storageManager = new StorageManager();
+    this.activeProviderName = null;
 
     // Initialize provider registry and set active provider
     this.initializeProviders();
@@ -80,8 +81,10 @@ export class Application {
     // Detect active provider
     const activeProvider = registry.detectActiveProvider();
     if (activeProvider) {
-      Logger.extension(`Active AI provider: ${activeProvider.getName()}`);
-      this.conversationManager.setProvider(activeProvider.getName());
+      const providerName = activeProvider.getName();
+      Logger.extension(`Active AI provider: ${providerName}`);
+      this.conversationManager.setProvider(providerName);
+      this.activeProviderName = providerName;
     } else {
       Logger.extension('No AI provider detected for current page');
     }

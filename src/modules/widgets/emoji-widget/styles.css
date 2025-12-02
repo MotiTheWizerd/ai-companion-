@@ -1,0 +1,83 @@
+/* Standalone styles for Semantix Emoji Widget */
+
+.semantix-emoji-panel {
+  position: absolute;
+  min-width: 260px;
+  max-width: 320px;
+  padding: 10px 12px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 12, 12, 0.97);
+  color: #f5f5f5;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 99999;
+}
+
+.semantix-emoji-panel--visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.semantix-emoji-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.semantix-emoji-panel__header button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 999px;
+  color: inherit;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.semantix-emoji-panel__content {
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.semantix-emoji-section {
+  margin-bottom: 10px;
+}
+
+.semantix-emoji-section__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+}
+
+.semantix-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+  gap: 6px;
+}
+
+.semantix-emoji-btn {
+  border: none;
+  border-radius: 8px;
+  font-size: 22px;
+  padding: 6px 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.semantix-emoji-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}

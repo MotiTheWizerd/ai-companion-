@@ -19,6 +19,7 @@ console.log('[Loader] VERSION CHECK: 2025-11-30 T 08:10');
   link.rel = 'stylesheet';
   link.href = chrome.runtime.getURL('src/modules/UIControls/styles.css');
   (document.head || document.documentElement).appendChild(link);
+
 })();
 
 async function relayProjectInfo(messageType = 'PROJECT_INFO_UPDATE') {

@@ -39,6 +39,7 @@ import {
 } from './chatHistoryHandlers.js';
 
 import { handleImportChat } from './chatImportHandlers.js';
+import { handleEmojiSelected } from './uiHandlers.js';
 
 /**
  * Handler Registry
@@ -74,4 +75,5 @@ export const HANDLER_REGISTRY = {
 
   // Chat Import events (only settings-triggered import)
   'import:chat': handleImportChat,
+  'emoji:selected': handleEmojiSelected,
 };
