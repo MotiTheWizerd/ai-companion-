@@ -9,7 +9,8 @@ export class ChatGPTSelector {
 
   /**
    * Get the selector for the toolbar/injection area
-   * Targets .ProseMirror, then we navigate up via getParentLevels()
+   * Design choice: toolbar floats at the top, so we always target <body>
+   * and let CSS keep it fixed/absolute in the viewport.
    * @returns {string} CSS selector
    */
   getToolbar() {
@@ -21,7 +22,7 @@ export class ChatGPTSelector {
    * @returns {number} Number of parent levels to go up
    */
   getParentLevels() {
-    return 4;
+    return 0;
   }
 
   /**

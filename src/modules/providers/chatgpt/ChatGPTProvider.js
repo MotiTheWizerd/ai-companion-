@@ -45,11 +45,47 @@ export class ChatGPTProvider extends BaseProvider {
 
         // Only modify if we have actual text
         if (typeof currentText === 'string' && currentText.trim().length > 0) {
-          // POC: Inject a word to the socket
-          const injectedText = currentText + "\n\n[SOCKET_INJECTION_POC: Hello from the socket!]";
-          body.messages[0].content.parts[0] = injectedText;
+          try {
+            console.log('[ChatGPTProvider] Requesting memory search via background...');
+            console.log('[ChatGPTProvider] Project ID: (Waiting for Loader injection)');
 
-          console.log('[ChatGPTProvider] INJECTED POC TO SOCKET. New text:', injectedText);
+            // Send API request through background script (bypasses CSP)
+            const searchResults = await this.sendBackgroundRequest({
+              method: 'POST',
+              endpoint: '/conversations/fetch-memory',
+              data: {
+                query: currentText,
+                user_id: API_CONFIG.USER_ID,
+                project_id: null, // Enforce loader injection
+                session_id: sessionId,
+                limit: 5,
+                min_similarity: 0.5,
+              }
+            });
+
+            console.log('[ChatGPTProvider] Search results:', searchResults.synthesized_memory);
+
+            if (searchResults.synthesized_memory && searchResults.synthesized_memory.length > 0) {
+              // Format the results into a string
+              const memoryContent = searchResults.synthesized_memory;
+              // Construct the memory block
+              const memoryBlock =
+                "[semantix-memory-block]\n" +
+                memoryContent + "\n" +
+                "[semantix-end-memory-block]\n\n";
+
+              console.log('[ChatGPTProvider] Memory block:', memoryBlock);
+
+              // Prepend memory block to the user's prompt
+              body.messages[0].content.parts[0] = memoryBlock + currentText;
+              console.log('[ChatGPTProvider] Modified prompt:', body.messages[0].content.parts[0]);
+            } else {
+              console.log('[ChatGPTProvider] No search results found');
+            }
+          } catch (apiError) {
+            console.warn('[ChatGPTProvider] Failed to fetch memory context:', apiError);
+            // Fallback to no memory injection on error
+          }
         }
       }
     } catch (error) {

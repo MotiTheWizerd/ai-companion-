@@ -34,26 +34,32 @@ export async function chatHandler(req, res) {
             limit: 5
         });
 
-        // 2. Build messages array
+        // 2. Prepare user message with memory injection
+        let userMessage = message;
+
+        if (memory) {
+            // Construct memory block and prepend to user message
+            const memoryBlock =
+                "[semantix-memory-block]\n" +
+                memory + "\n" +
+                "[semantix-end-memory-block]\n\n";
+
+            userMessage = memoryBlock + message;
+            console.log('[ChatHandler] Memory injected: YES');
+        } else {
+            console.log('[ChatHandler] Memory injected: NO');
+        }
+
+        // 3. Build messages array with modified user message
         const messages = [
             ...history,
-            { role: 'user', content: message }
+            { role: 'user', content: userMessage }
         ];
-
-        // 3. Prepare system_hints with memory (INVISIBLE injection)
-        const systemHints = memory ? {
-            memory_context: memory,
-            injected_by: 'chatgpt-api-wrapper',
-            timestamp: new Date().toISOString()
-        } : null;
-
-        console.log('[ChatHandler] Memory injected:', memory ? 'YES' : 'NO');
 
         // 4. Call OpenAI with modified payload
         const response = await callOpenAI({
             messages,
-            model,
-            system_hints: systemHints || undefined
+            model
         });
 
         // 5. Return response
