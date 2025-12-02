@@ -14,16 +14,24 @@ function App() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const handleProjectChange = (e) => {
     const newValue = e.target.value;
-    console.log('[Popup] Project changed to:', newValue);
+    const selectedOption = e.target.options[e.target.selectedIndex];
+    const selectedLabel = selectedOption ? selectedOption.textContent.trim() : '';
+
+    console.log('[Popup] Project changed to:', newValue, selectedLabel);
     setSelectedProject(newValue);
+
+    const payload = {
+      selectedProjectId: newValue || null,
+      selectedProjectName: newValue ? (selectedLabel || newValue) : null,
+    };
 
     // Save to chrome.storage with error handling
     try {
-      chrome.storage.local.set({ selectedProjectId: newValue }, () => {
+      chrome.storage.local.set(payload, () => {
         if (chrome.runtime.lastError) {
           console.error('[Popup] Error saving selected project:', chrome.runtime.lastError);
         } else {
-          console.log('[Popup] Selected project saved to storage:', newValue);
+          console.log('[Popup] Selected project saved to storage:', payload);
         }
       });
     } catch (error) {

@@ -1,4 +1,4 @@
-import { HeaderToolbar } from "../SemantixUIComponents/index.js";
+﻿import { HeaderToolbar } from "../SemantixUIComponents/index.js";
 import { eventBus } from "../../content/core/eventBus.js";
 
 /**
@@ -13,6 +13,15 @@ export class ToolbarController {
     this.isInitialized = false;
     this.retryCount = 0;
     this.toolbarElement = null; // Store reference to toolbar element
+    this.statusTextElement = null;
+    this.statusDotElement = null;
+    this.projectDisplayText = "Project: Loading...";
+    this.hasProjectSelected = false;
+    this.storageListener = null;
+    this.projectInfoCache = null;
+    this.projectBridgeResolvers = [];
+    this.bridgeRequestPending = false;
+    this.projectBridgeHandler = null;
   }
 
   init() {
@@ -32,6 +41,7 @@ export class ToolbarController {
     }
 
     this.startObserver();
+    this.registerStorageListener();
     this.isInitialized = true;
   }
 
@@ -126,6 +136,11 @@ export class ToolbarController {
     this.statusTextElement = toolbarElement.querySelector(
       ".semantix-status-text",
     );
+    this.statusDotElement = toolbarElement.querySelector(
+      ".semantix-status-dot",
+    );
+    this.updateStatusIndicator(false);
+    this.refreshProjectStatusText();
 
     // Add click event to settings icon (will be added later when needed)
     // Styles are now handled by CSS class .semantix-header-toolbar
@@ -164,16 +179,16 @@ export class ToolbarController {
     if (showSettingsIcon) {
       return `
                 <div class='semantix-header-toolbar'>
-                    <span class="semantix-status-dot"></span>
+                    <span class="semantix-status-dot offline"></span>
                     <span class="semantix-status-text">Active</span>
-                    <span class="semantix-settings-icon">⚙️</span>
+                    <span class="semantix-settings-icon">âš™ï¸</span>
                 </div>
             `;
     } else {
       return `
                 <div class='semantix-header-toolbar'>
-                    <span class="semantix-status-dot"></span>
-                    <span class="semantix-status-text">Monitoring</span>
+                    <span class="semantix-status-dot offline"></span>
+                    <span class="semantix-status-text">Project: Loading...</span>
                 </div>
             `;
     }
@@ -190,9 +205,11 @@ export class ToolbarController {
     if (this.toolbarElement) {
       // Update the status text
       if (this.statusTextElement) {
-        this.statusTextElement.textContent = "Active";
+        this.statusTextElement.classList.add("active");
+        this.statusTextElement.textContent = this.projectDisplayText;
         this.statusTextElement.className = "semantix-status-text active";
       }
+      this.updateStatusIndicator(this.hasProjectSelected);
 
       // Check if settings icon already exists
       const existingIcon = this.toolbarElement.querySelector(
@@ -208,7 +225,7 @@ export class ToolbarController {
       // Add the settings icon to the existing toolbar
       const settingsIcon = document.createElement("span");
       settingsIcon.className = "semantix-settings-icon";
-      settingsIcon.textContent = "⚙️";
+      settingsIcon.textContent = "âš™ï¸";
 
       // Add click event to settings icon
       settingsIcon.addEventListener("click", (event) => {
@@ -241,4 +258,241 @@ export class ToolbarController {
       );
     }
   }
+
+  registerStorageListener() {
+    if (!this.canUseChromeStorage()) {
+      console.warn(
+        "[ToolbarController] chrome.storage not available, using loader bridge",
+      );
+      this.setupProjectBridgeChannel();
+      return;
+    }
+
+    this.storageListener = (changes, areaName) => {
+    if (areaName !== "local") return;
+    if (
+      changes.selectedProjectId ||
+      changes.selectedProjectName ||
+      changes.user_settings
+    ) {
+        console.log(
+          "[ToolbarController] Detected project change in storage, refreshing toolbar text",
+        );
+        this.refreshProjectStatusText();
+      }
+    };
+
+    chrome.storage.onChanged.addListener(this.storageListener);
+  }
+
+  async refreshProjectStatusText() {
+    if (!this.statusTextElement) {
+      return;
+    }
+    const statusInfo = await this.getProjectStatus();
+    this.applyStatusInfo(statusInfo);
+  }
+
+  updateStatusIndicator(hasProject) {
+    if (!this.statusDotElement) return;
+    this.statusDotElement.classList.toggle("online", hasProject);
+    this.statusDotElement.classList.toggle("offline", !hasProject);
+  }
+
+  applyStatusInfo(statusInfo) {
+    if (!statusInfo) return;
+    this.projectDisplayText = statusInfo.text;
+    this.hasProjectSelected = statusInfo.hasProject;
+    if (this.statusTextElement) {
+      this.statusTextElement.textContent = statusInfo.text;
+    }
+    this.updateStatusIndicator(statusInfo.hasProject);
+  }
+
+  async getProjectStatus() {
+    if (this.canUseChromeStorage()) {
+      return new Promise((resolve) => {
+        try {
+          chrome.storage.local.get(
+            ["selectedProjectId", "selectedProjectName", "user_settings"],
+            (result) => {
+              if (chrome.runtime?.lastError) {
+                console.warn(
+                  "[ToolbarController] Failed to read project from storage:",
+                  chrome.runtime.lastError,
+                );
+                resolve({ text: "Project: Unknown", hasProject: false });
+                return;
+              }
+
+              const selectedProjectId = result.selectedProjectId || null;
+              const selectedProjectName = result.selectedProjectName || null;
+              const projects = result.user_settings?.projects || [];
+              resolve(
+                this.formatProjectStatus(
+                  selectedProjectId,
+                  projects || [],
+                  selectedProjectName,
+                ),
+              );
+            },
+          );
+        } catch (error) {
+          console.warn(
+            "[ToolbarController] Unexpected error reading project info:",
+            error,
+          );
+          resolve({ text: "Project: Unknown", hasProject: false });
+        }
+      });
+    }
+
+    // Fall back to loader bridge if chrome.storage isn't available
+    this.setupProjectBridgeChannel();
+
+    if (this.projectInfoCache) {
+      return this.formatProjectStatus(
+        this.projectInfoCache.selectedProjectId,
+        this.projectInfoCache.projects,
+        this.projectInfoCache.selectedProjectName,
+      );
+    }
+
+    return await new Promise((resolve) => {
+      this.projectBridgeResolvers.push(resolve);
+      this.requestProjectInfoViaBridge();
+
+      setTimeout(() => {
+        const index = this.projectBridgeResolvers.indexOf(resolve);
+        if (index !== -1) {
+          this.projectBridgeResolvers.splice(index, 1);
+          console.warn(
+            "[ToolbarController] Project info bridge timeout, using fallback label",
+          );
+          resolve({ text: "Project: Unavailable", hasProject: false });
+        }
+      }, 5000);
+    });
+  }
+
+  canUseChromeStorage() {
+    return (
+      typeof chrome !== "undefined" &&
+      !!chrome.storage &&
+      !!chrome.storage.local &&
+      !!chrome.storage.onChanged
+    );
+  }
+
+  formatProjectStatus(
+    selectedProjectId,
+    projects = [],
+    selectedProjectName = null,
+  ) {
+    let projectName = selectedProjectName || null;
+
+    if (!projectName && selectedProjectId) {
+      const match = projects.find((project) => {
+        if (typeof project === "string") {
+          return project === selectedProjectId;
+        }
+
+        const candidateId =
+          project?.id || project?._id || project?.project_id || project?.uuid;
+        return candidateId === selectedProjectId;
+      });
+
+      if (typeof match === "string") {
+        projectName = match;
+      } else if (match) {
+        projectName =
+          match.name ||
+          match.title ||
+          match.projectName ||
+          match.label ||
+          match.project_name ||
+          match.id ||
+          match.project_id ||
+          selectedProjectId;
+      }
+    }
+
+    if (projectName) {
+      return { text: `Project: ${projectName}`, hasProject: true };
+    }
+
+    if (selectedProjectId) {
+      return { text: `Project: ${selectedProjectId}`, hasProject: true };
+    }
+
+    return { text: "Project: Not selected", hasProject: false };
+  }
+
+  setupProjectBridgeChannel() {
+    if (this.projectBridgeHandler) return;
+
+    this.projectBridgeHandler = (event) => {
+      if (event.source !== window) return;
+      const message = event.data;
+      if (!message || message.source !== "chatgpt-extension-response") return;
+
+      if (
+        message.type === "REQUEST_PROJECT_INFO" ||
+        message.type === "PROJECT_INFO_UPDATE"
+      ) {
+        if (message.success === false) {
+          console.warn(
+            "[ToolbarController] Bridge reported error:",
+            message.error,
+          );
+          this.bridgeRequestPending = false;
+          return;
+        }
+        this.handleProjectInfoFromBridge(message.data || {});
+      }
+    };
+
+    window.addEventListener("message", this.projectBridgeHandler);
+    this.requestProjectInfoViaBridge(true);
+  }
+
+  requestProjectInfoViaBridge(force = false) {
+    if (this.bridgeRequestPending && !force) {
+      return;
+    }
+    this.bridgeRequestPending = true;
+
+    window.postMessage(
+      {
+        source: "chatgpt-extension",
+        type: "REQUEST_PROJECT_INFO",
+      },
+      "*",
+    );
+  }
+
+  handleProjectInfoFromBridge(data = {}) {
+    this.bridgeRequestPending = false;
+    this.projectInfoCache = {
+      selectedProjectId: data.selectedProjectId || null,
+      selectedProjectName: data.selectedProjectName || null,
+      projects: Array.isArray(data.projects) ? data.projects : [],
+    };
+
+    const status = this.formatProjectStatus(
+      this.projectInfoCache.selectedProjectId,
+      this.projectInfoCache.projects,
+      this.projectInfoCache.selectedProjectName,
+    );
+
+    if (this.projectBridgeResolvers.length > 0) {
+      const resolvers = [...this.projectBridgeResolvers];
+      this.projectBridgeResolvers = [];
+      resolvers.forEach((resolve) => resolve(status));
+    }
+
+    this.applyStatusInfo(status);
+  }
 }
+
+

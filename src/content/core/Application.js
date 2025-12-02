@@ -14,7 +14,7 @@ import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
 import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
 import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
 import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
-import { ToolbarController } from '../../modules/UIControls/index.js';
+import { ToolbarController, WidgetController } from '../../modules/UIControls/index.js';
 import { ChatImportManager } from '../../modules/ChatImportManager/ChatImportManager.js';
 
 import { APIClient } from '../../modules/APIClient/index.js';
@@ -38,6 +38,7 @@ export class Application {
 
     // Initialize UI Controllers
     this.toolbarController = new ToolbarController(this.conversationManager, this.chatHistoryManager);
+    this.widgetController = new WidgetController(this.conversationManager);
 
     // Initialize API Client for making backend requests
     this.apiClient = new APIClient({
@@ -101,6 +102,7 @@ export class Application {
 
     // Initialize UI Controllers
     this.toolbarController.init();
+    this.widgetController.init();
 
     // Initialize Universal Chat History monitoring
     this.chatHistoryManager.setupResumeChatObserver();

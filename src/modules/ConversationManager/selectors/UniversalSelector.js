@@ -54,6 +54,26 @@ export class UniversalSelector {
   }
 
   /**
+   * Get widget container selector (if supported)
+   * @returns {string|null}
+   */
+  getWidgetContainer() {
+    return this.provider.getWidgetContainer
+      ? this.provider.getWidgetContainer()
+      : null;
+  }
+
+  /**
+   * Preferred insertion position for widgets
+   * @returns {string}
+   */
+  getWidgetPosition() {
+    return this.provider.getWidgetPosition
+      ? this.provider.getWidgetPosition()
+      : "append";
+  }
+
+  /**
    * Get the input selector
    * @returns {string} CSS selector
    */

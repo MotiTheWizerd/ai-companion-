@@ -52,6 +52,22 @@ export class ChatGPTSelector {
   }
 
   /**
+   * Target container for Semantix widgets (sits above composer)
+   * @returns {string|null} CSS selector
+   */
+  getWidgetContainer() {
+    return "#thread-bottom .flex.justify-center.empty\\:hidden";
+  }
+
+  /**
+   * Preferred insertion strategy for widgets
+   * @returns {string} 'append' | 'prepend' | 'before' | 'after'
+   */
+  getWidgetPosition() {
+    return "prepend";
+  }
+
+  /**
    * Get the selector for the send button
    * @returns {string} CSS selector
    */

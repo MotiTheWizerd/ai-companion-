@@ -21,6 +21,39 @@ console.log('[Loader] VERSION CHECK: 2025-11-30 T 08:10');
   (document.head || document.documentElement).appendChild(link);
 })();
 
+async function relayProjectInfo(messageType = 'PROJECT_INFO_UPDATE') {
+  try {
+    const result = await chrome.storage.local.get(['selectedProjectId', 'selectedProjectName', 'user_settings']);
+    window.postMessage({
+      source: 'chatgpt-extension-response',
+      type: messageType,
+      success: true,
+      data: {
+        selectedProjectId: result.selectedProjectId || null,
+        selectedProjectName: result.selectedProjectName || null,
+        projects: result.user_settings?.projects || []
+      }
+    }, '*');
+  } catch (error) {
+    console.warn('[Loader] Failed to relay project info:', error);
+    window.postMessage({
+      source: 'chatgpt-extension-response',
+      type: messageType,
+      success: false,
+      error: error?.message || 'Unable to read project info'
+    }, '*');
+  }
+}
+
+if (chrome?.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes.selectedProjectId || changes.selectedProjectName || changes.user_settings) {
+      relayProjectInfo('PROJECT_INFO_UPDATE');
+    }
+  });
+}
+
 /**
  * Message Bridge: Page Context ↔ Content Script ↔ Background
  *
@@ -37,6 +70,11 @@ window.addEventListener('message', async (event) => {
   if (!event.data || event.data.source !== 'chatgpt-extension') return;
 
   console.log('[Loader] Received message from page:', event.data.type);
+
+  if (event.data.type === 'REQUEST_PROJECT_INFO') {
+    await relayProjectInfo('REQUEST_PROJECT_INFO');
+    return;
+  }
 
   // Deep clone to ensure we have a mutable object and no reference issues
   let requestPayload = JSON.parse(JSON.stringify({

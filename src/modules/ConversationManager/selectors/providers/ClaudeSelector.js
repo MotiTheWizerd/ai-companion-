@@ -25,6 +25,18 @@ export class ClaudeSelector {
     }
 
     /**
+     * Claude currently does not render Semantix widgets
+     * @returns {null}
+     */
+    getWidgetContainer() {
+        return null;
+    }
+
+    getWidgetPosition() {
+        return 'append';
+    }
+
+    /**
      * Get the selector for the input area
      * @returns {string} CSS selector
      */
