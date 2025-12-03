@@ -2,24 +2,32 @@
  * Main Application orchestrator
  * Coordinates all modules and manages application lifecycle
  */
-import { eventBus } from './eventBus.js';
-import { Logger } from '../modules/utils/logger.js';
-import { NetworkInterceptor } from '../../modules/NetworkInterceptor/index.js';
-import { ConversationManager } from '../../modules/ConversationManager/index.js';
-import { MessageManager } from '../../modules/MessageManager/index.js';
-import { StorageManager } from '../../modules/StorageManager/index.js';
-import { exposeAPI } from '../modules/publicAPI.js';
-import { HANDLER_REGISTRY } from '../modules/eventHandlers/registry.js';
-import { ProviderRegistry } from '../../modules/providers/ProviderRegistry.js';
-import { ChatGPTProvider } from '../../modules/providers/chatgpt/ChatGPTProvider.js';
-import { ClaudeProvider } from '../../modules/providers/claude/ClaudeProvider.js';
-import { QwenProvider } from '../../modules/providers/qwen/QwenProvider.js';
-import { ToolbarController, WidgetController } from '../../modules/UIControls/index.js';
-import { ChatImportManager } from '../../modules/ChatImportManager/ChatImportManager.js';
+import { eventBus } from "./eventBus.js";
+import { Logger } from "../modules/utils/logger.js";
+import { NetworkInterceptor } from "../../modules/NetworkInterceptor/index.js";
+import { ConversationManager } from "../../modules/ConversationManager/index.js";
+import { MessageManager } from "../../modules/MessageManager/index.js";
+import { StorageManager } from "../../modules/StorageManager/index.js";
+import { exposeAPI } from "../modules/publicAPI.js";
+import { HANDLER_REGISTRY } from "../modules/eventHandlers/registry.js";
+import { ProviderRegistry } from "../../modules/providers/ProviderRegistry.js";
+import { ChatGPTProvider } from "../../modules/providers/chatgpt/ChatGPTProvider.js";
+import { ClaudeProvider } from "../../modules/providers/claude/ClaudeProvider.js";
+import { QwenProvider } from "../../modules/providers/qwen/QwenProvider.js";
+import {
+  ToolbarController,
+  WidgetController,
+} from "../../modules/UIControls/index.js";
+import { ChatImportManager } from "../../modules/ChatImportManager/ChatImportManager.js";
 
-import { APIClient } from '../../modules/APIClient/index.js';
-import { API_CONFIG } from './constants.js';
-import { UniversalChatHistory, EventIntegration } from '../../modules/UniversalChatHistory/index.js';
+import { APIClient } from "../../modules/APIClient/index.js";
+import { API_CONFIG } from "./constants.js";
+import {
+  UniversalChatHistory,
+  EventIntegration,
+} from "../../modules/UniversalChatHistory/index.js";
+import { LifecycleBridge } from "./LifecycleBridge.js";
+import { DebugConsole } from "./DebugConsole.js";
 
 export class Application {
   constructor() {
@@ -29,16 +37,24 @@ export class Application {
     this.messageManager = new MessageManager();
     this.storageManager = new StorageManager();
     this.activeProviderName = null;
+    this.lifecycleBridge = new LifecycleBridge();
+    this.debugConsole = new DebugConsole();
 
     // Initialize provider registry and set active provider
     this.initializeProviders();
 
     // Initialize Universal Chat History module
     this.chatHistoryManager = new UniversalChatHistory();
-    this.eventIntegration = new EventIntegration(this.chatHistoryManager, eventBus);
+    this.eventIntegration = new EventIntegration(
+      this.chatHistoryManager,
+      eventBus,
+    );
 
     // Initialize UI Controllers
-    this.toolbarController = new ToolbarController(this.conversationManager, this.chatHistoryManager);
+    this.toolbarController = new ToolbarController(
+      this.conversationManager,
+      this.chatHistoryManager,
+    );
     this.widgetController = new WidgetController(this.conversationManager);
 
     // Initialize API Client for making backend requests
@@ -86,7 +102,7 @@ export class Application {
       this.conversationManager.setProvider(providerName);
       this.activeProviderName = providerName;
     } else {
-      Logger.extension('No AI provider detected for current page');
+      Logger.extension("No AI provider detected for current page");
     }
   }
 
@@ -95,7 +111,7 @@ export class Application {
    * Sets up interceptors, event listeners, and public API
    */
   init() {
-    Logger.extension('Initializing...');
+    Logger.extension("Initializing...");
 
     // Initialize API Client
     this.apiClient.init();
@@ -103,7 +119,7 @@ export class Application {
     // Initialize network interception
     this.interceptor.init();
 
-    // Initialize UI Controllers
+    // Initialize UI Controllers (Toolbar and Widgets)
     this.toolbarController.init();
     this.widgetController.init();
 
@@ -116,7 +132,7 @@ export class Application {
     // Expose public API
     exposeAPI(this.conversationManager, this.storageManager);
 
-    Logger.extension('Ready');
+    Logger.extension("Ready");
   }
 
   /**
@@ -130,7 +146,9 @@ export class Application {
       });
     });
 
-    Logger.extension(`Registered ${Object.keys(HANDLER_REGISTRY).length} event handlers`);
+    Logger.extension(
+      `Registered ${Object.keys(HANDLER_REGISTRY).length} event handlers`,
+    );
   }
 
   /**
@@ -138,7 +156,7 @@ export class Application {
    * Removes event listeners and cleans up resources
    */
   destroy() {
-    Logger.extension('Shutting down...');
+    Logger.extension("Shutting down...");
     // Future: Add cleanup logic if needed
   }
 }

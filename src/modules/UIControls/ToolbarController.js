@@ -1,5 +1,5 @@
-﻿import { HeaderToolbar } from "../SemantixUIComponents/index.js";
 import { eventBus } from "../../content/core/eventBus.js";
+import { RetryManager } from "./utils/RetryManager.js";
 
 /**
  * Controls the injection and management of the toolbar.
@@ -9,10 +9,8 @@ export class ToolbarController {
   constructor(conversationManager, chatHistoryManager) {
     this.conversationManager = conversationManager;
     this.chatHistoryManager = chatHistoryManager;
-    this.observer = null;
     this.isInitialized = false;
-    this.retryCount = 0;
-    this.toolbarElement = null; // Store reference to toolbar element
+    this.toolbarElement = null;
     this.statusTextElement = null;
     this.statusDotElement = null;
     this.projectDisplayText = "Project: Loading...";
@@ -23,117 +21,156 @@ export class ToolbarController {
     this.bridgeRequestPending = false;
     this.projectBridgeHandler = null;
     this.storageWarningLogged = false;
+    this.retryManager = new RetryManager();
+    this.lifecycleHandlers = null;
   }
 
   init() {
     if (this.isInitialized) return;
-    console.log("[ToolbarController] Initialized");
+    this.logDebug("init");
 
-    // Register callback early to catch conversations detected after init
     if (this.chatHistoryManager) {
-      this.chatHistoryManager.onConversationCaptured((claudeData) => {
-        console.log(
-          "[ToolbarController] onConversationCaptured callback triggered with data",
-        );
+      this.chatHistoryManager.onConversationCaptured(() => {
+        this.logDebug("conversation:captured");
         this.showSettingsIcon();
-        // Automatic import removed as per user request.
-        // Import is now triggered only via settings icon click.
       });
     }
 
-    this.startObserver();
+    this.registerLifecycleListeners();
     this.registerStorageListener();
+    this.tryInjectWithRetry("init");
     this.isInitialized = true;
   }
 
-  startObserver() {
-    if (!document.body) {
-      console.log("[ToolbarController] document.body not ready, waiting...");
-      window.addEventListener("DOMContentLoaded", () => this.startObserver());
+  registerLifecycleListeners() {
+    if (this.lifecycleHandlers) return;
+    this.lifecycleHandlers = {
+      domReady: (detail) => this.handleDomReady(detail),
+      hostMutation: (detail) => this.handleHostMutation(detail),
+      navigation: (detail) => this.handleNavigation(detail),
+    };
+    eventBus.on("lifecycle:dom-ready", this.lifecycleHandlers.domReady);
+    eventBus.on("lifecycle:host-mutation", this.lifecycleHandlers.hostMutation);
+    eventBus.on("lifecycle:navigation", this.lifecycleHandlers.navigation);
+  }
+
+  handleDomReady(detail) {
+    this.logDebug("lifecycle:dom-ready", { detail });
+    this.tryInjectWithRetry("dom-ready");
+  }
+
+  handleHostMutation(detail) {
+    this.logDebug("lifecycle:host-mutation", { detail });
+    if (this.toolbarElement && document.body.contains(this.toolbarElement)) {
       return;
     }
+    this.tryInjectWithRetry("host-mutation");
+  }
 
-    console.log("[ToolbarController] Starting MutationObserver...");
-    this.observer = new MutationObserver((mutations) => {
-      console.log(
-        "[ToolbarController] MutationObserver triggered, mutations count:",
-        mutations.length,
-      );
-      this.attemptInjection();
-    });
+  handleNavigation(detail) {
+    this.logDebug("lifecycle:navigation", { detail });
+    this.destroyToolbar();
+    this.tryInjectWithRetry("navigation");
+  }
 
-    this.observer.observe(document.body, { childList: true, subtree: true });
-
-    // Initial injection attempt
-    this.attemptInjection();
+  tryInjectWithRetry(reason = "manual") {
+    this.logDebug("attempt:start", { detail: { reason } });
+    const injected = this.attemptInjection();
+    if (injected) {
+      this.retryManager.cancel();
+      this.logDebug("attempt:success", { detail: { reason } });
+      return true;
+    }
+    this.logDebug("attempt:pending", { detail: { reason } });
+    this.retryManager.schedule(() => this.tryInjectWithRetry("retry"));
+    return false;
   }
 
   attemptInjection() {
-    console.log("[ToolbarController] attemptInjection called");
-    const selectors = this.conversationManager.getSelectors();
-    const toolbarSelector = selectors.getToolbar();
-    const position = selectors.getToolbarPosition();
-    const parentLevels = selectors.provider.getParentLevels
+    if (!document.body) {
+      this.logDebug("attempt:blocked", { detail: { reason: "no-body" } });
+      return false;
+    }
+
+    if (this.toolbarElement) {
+      if (document.body.contains(this.toolbarElement)) {
+        this.logDebug("attempt:skipped", {
+          detail: { reason: "already-present" },
+        });
+        return true;
+      }
+      this.toolbarElement = null;
+    }
+
+    const selectors = this.conversationManager?.getSelectors();
+    if (!selectors) {
+      this.logDebug("attempt:blocked", { detail: { reason: "no-selectors" } });
+      return false;
+    }
+
+    const toolbarSelector = selectors.getToolbar?.();
+    if (!toolbarSelector) {
+      this.logDebug("attempt:blocked", { detail: { reason: "no-selector" } });
+      return false;
+    }
+
+    const position = selectors.getToolbarPosition
+      ? selectors.getToolbarPosition()
+      : "append";
+    const parentLevels = selectors.provider?.getParentLevels
       ? selectors.provider.getParentLevels()
       : 0;
-    console.log(
-      "[ToolbarController] Using selector:",
-      toolbarSelector,
-      "position:",
-      position,
-      "parentLevels:",
-      parentLevels,
-    );
 
-    let targetElement = document.querySelector(toolbarSelector);
-    console.log("[ToolbarController] Initial element found:", targetElement);
+    let targetElement = null;
+    try {
+      targetElement = document.querySelector(toolbarSelector);
+    } catch (error) {
+      console.warn(
+        "[ToolbarController] Invalid toolbar selector:",
+        toolbarSelector,
+        error,
+      );
+      this.logDebug("attempt:error", { detail: { reason: "invalid-selector" } });
+      return false;
+    }
 
-    // Traverse up parent levels if specified
     for (let i = 0; i < parentLevels && targetElement; i++) {
       targetElement = targetElement.parentElement;
     }
-    console.log(
-      "[ToolbarController] Target element after traversal:",
-      targetElement,
-    );
+
     const existingToolbar = document.querySelector(".semantix-header-toolbar");
+    if (existingToolbar) {
+      this.toolbarElement = existingToolbar;
+      this.statusTextElement = existingToolbar.querySelector(
+        ".semantix-status-text",
+      );
+      this.statusDotElement = existingToolbar.querySelector(
+        ".semantix-status-dot",
+      );
+      this.logDebug("attempt:attached-existing");
+      return true;
+    }
 
     if (!targetElement) {
-      if (this.retryCount < 10) {
-        this.retryCount++;
-        console.warn(
-          "[ToolbarController] Target not found, retry attempt",
-          this.retryCount,
-        );
-        setTimeout(() => this.attemptInjection(), 500);
-      } else {
-        console.error(
-          "[ToolbarController] Max retry attempts reached, giving up.",
-        );
-      }
-      return;
+      this.logDebug("attempt:waiting", { detail: { reason: "target-missing" } });
+      return false;
     }
 
-    if (existingToolbar) {
-      console.log(
-        "[ToolbarController] Toolbar already exists, skipping injection",
-      );
-      return;
-    }
-
-    console.log("[ToolbarController] Found target element, injecting toolbar");
-    this.injectToolbar(targetElement, position);
+    return this.injectToolbar(targetElement, position);
   }
 
   injectToolbar(targetElement, position) {
-    // Create toolbar without settings icon initially
-    const toolbarHtml = this.getHeaderToolbarHTML(false); // Don't show settings icon initially
+    const toolbarHtml = this.getHeaderToolbarHTML(false);
     const tempDiv = document.createElement("div");
     tempDiv.innerHTML = toolbarHtml;
     const toolbarElement = tempDiv.firstElementChild;
-    this.toolbarElement = toolbarElement;
 
-    // Store reference to status text element to update it later
+    if (!toolbarElement) {
+      this.logDebug("attempt:error", { detail: { reason: "template-failed" } });
+      return false;
+    }
+
+    this.toolbarElement = toolbarElement;
     this.statusTextElement = toolbarElement.querySelector(
       ".semantix-status-text",
     );
@@ -143,10 +180,6 @@ export class ToolbarController {
     this.updateStatusIndicator(false);
     this.refreshProjectStatusText();
 
-    // Add click event to settings icon (will be added later when needed)
-    // Styles are now handled by CSS class .semantix-header-toolbar
-
-    // Insert according to requested position
     if (position === "after") {
       targetElement.parentNode.insertBefore(
         toolbarElement,
@@ -155,20 +188,13 @@ export class ToolbarController {
     } else if (position === "before") {
       targetElement.parentNode.insertBefore(toolbarElement, targetElement);
     } else if (position === "prepend") {
-      // Insert as first child of target element
       targetElement.insertBefore(toolbarElement, targetElement.firstChild);
-    } else if (position === "append") {
-      targetElement.appendChild(toolbarElement);
     } else {
       targetElement.appendChild(toolbarElement);
     }
 
-    console.log(
-      "[ToolbarController] Toolbar injected (without settings icon initially)",
-    );
-
-    // Note: callback for showing settings icon is now registered in init()
-    // to ensure it catches conversations detected early
+    this.logDebug("attempt:injected", { detail: { position } });
+    return true;
   }
 
   /**
@@ -182,7 +208,7 @@ export class ToolbarController {
                 <div class='semantix-header-toolbar'>
                     <span class="semantix-status-dot offline"></span>
                     <span class="semantix-status-text">Active</span>
-                    <span class="semantix-settings-icon">âš™ï¸</span>
+                    <span class="semantix-settings-icon">�sT�,?</span>
                 </div>
             `;
     } else {
@@ -199,12 +225,9 @@ export class ToolbarController {
    * Show the settings icon in the toolbar after conversation is captured
    */
   showSettingsIcon() {
-    console.log(
-      "[ToolbarController] Showing settings icon after conversation capture",
-    );
+    this.logDebug("settings:show");
 
     if (this.toolbarElement) {
-      // Update the status text
       if (this.statusTextElement) {
         this.statusTextElement.classList.add("active");
         this.statusTextElement.textContent = this.projectDisplayText;
@@ -212,51 +235,38 @@ export class ToolbarController {
       }
       this.updateStatusIndicator(this.hasProjectSelected);
 
-      // Check if settings icon already exists
       const existingIcon = this.toolbarElement.querySelector(
         ".semantix-settings-icon",
       );
       if (existingIcon) {
-        console.log(
-          "[ToolbarController] Settings icon already exists, skipping",
-        );
+        this.logDebug("settings:exists");
         return;
       }
 
-      // Add the settings icon to the existing toolbar
       const settingsIcon = document.createElement("span");
       settingsIcon.className = "semantix-settings-icon";
-      settingsIcon.textContent = "âš™ï¸";
+      settingsIcon.textContent = "�sT�,?";
 
-      // Add click event to settings icon
       settingsIcon.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        console.log("[ToolbarController] Settings icon clicked");
-
-        // Create a simple settings popup or trigger settings functionality
+        this.logDebug("settings:click");
         this.openSettings();
       });
 
-      // Add the settings icon to the toolbar
       this.toolbarElement.appendChild(settingsIcon);
-      console.log("[ToolbarController] Settings icon added to toolbar");
+      this.logDebug("settings:added");
     }
   }
 
   openSettings() {
-    // Create a simple settings modal or trigger settings functionality
-    console.log("[ToolbarController] Opening settings");
+    this.logDebug("settings:open");
 
-    // Emit event to trigger chat import flow after settings opened
     try {
       eventBus.emit("import:chat", { source: "toolbar-settings" });
-      console.log('[ToolbarController] Emitted event "import:chat"');
+      this.logDebug("settings:event-emitted");
     } catch (err) {
-      console.error(
-        "[ToolbarController] Failed to emit import:chat event",
-        err,
-      );
+      console.error("[ToolbarController] Failed to emit import:chat event", err);
     }
   }
 
@@ -273,15 +283,13 @@ export class ToolbarController {
     }
 
     this.storageListener = (changes, areaName) => {
-    if (areaName !== "local") return;
-    if (
-      changes.selectedProjectId ||
-      changes.selectedProjectName ||
-      changes.user_settings
-    ) {
-        console.log(
-          "[ToolbarController] Detected project change in storage, refreshing toolbar text",
-        );
+      if (areaName !== "local") return;
+      if (
+        changes.selectedProjectId ||
+        changes.selectedProjectName ||
+        changes.user_settings
+      ) {
+        this.logDebug("storage:update");
         this.refreshProjectStatusText();
       }
     };
@@ -351,7 +359,6 @@ export class ToolbarController {
       });
     }
 
-    // Fall back to loader bridge if chrome.storage isn't available
     this.setupProjectBridgeChannel();
 
     if (this.projectInfoCache) {
@@ -373,7 +380,10 @@ export class ToolbarController {
           console.warn(
             "[ToolbarController] Project info bridge timeout, using fallback label",
           );
+          this.bridgeRequestPending = false;
           resolve({ text: "Project: Unavailable", hasProject: false });
+          // Schedule another request in case the bridge becomes available later
+          setTimeout(() => this.requestProjectInfoViaBridge(true), 1000);
         }
       }, 5000);
     });
@@ -497,6 +507,18 @@ export class ToolbarController {
 
     this.applyStatusInfo(status);
   }
+
+  destroyToolbar() {
+    if (this.toolbarElement && this.toolbarElement.parentNode) {
+      this.toolbarElement.remove();
+    }
+    this.toolbarElement = null;
+    this.statusTextElement = null;
+    this.statusDotElement = null;
+    this.retryManager.cancel();
+  }
+
+  logDebug(stage, detail = {}) {
+    eventBus.emit("debug:toolbar", { stage, detail });
+  }
 }
-
-
