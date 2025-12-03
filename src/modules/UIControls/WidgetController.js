@@ -1,6 +1,7 @@
 import { SemantixWidgets } from "../SemantixUIComponents/index.js";
 import { eventBus } from "../../content/core/eventBus.js";
 import { EmojiWidget } from "../widgets/emoji-widget/EmojiWidget.js";
+import { QuickJumpWidget } from "../widgets/quick-jump-widget/QuickJumpWidget.js";
 import { RetryManager } from "./utils/RetryManager.js";
 
 /**
@@ -14,6 +15,7 @@ export class WidgetController {
     this.retryManager = new RetryManager();
     this.lifecycleHandlers = null;
     this.emojiWidget = null;
+    this.quickJumpWidget = null;
   }
 
   init() {
@@ -39,12 +41,17 @@ export class WidgetController {
   }
 
   handleDomReady(detail) {
+    console.log("[WidgetController] handleDomReady triggered");
     this.logDebug("lifecycle:dom-ready", { detail });
     this.tryInjectWithRetry("dom-ready");
+    this.initQuickJump();
   }
 
   handleHostMutation(detail) {
     this.logDebug("lifecycle:host-mutation", { detail });
+    // Try to init QuickJump if not already initialized
+    this.initQuickJump();
+
     if (this.widgetElement && document.body.contains(this.widgetElement)) {
       return;
     }
@@ -55,6 +62,9 @@ export class WidgetController {
     this.logDebug("lifecycle:navigation", { detail });
     this.destroyWidget();
     this.tryInjectWithRetry("navigation");
+    // Re-initialize QuickJump for new conversation
+    this.destroyQuickJump();
+    this.initQuickJump();
   }
 
   tryInjectWithRetry(reason = "manual") {
@@ -133,7 +143,9 @@ export class WidgetController {
     }
 
     if (!targetElement) {
-      this.logDebug("attempt:waiting", { detail: { reason: "target-missing" } });
+      this.logDebug("attempt:waiting", {
+        detail: { reason: "target-missing" },
+      });
       return false;
     }
 
@@ -164,7 +176,10 @@ export class WidgetController {
         break;
       case "after":
         if (targetElement.parentNode) {
-          targetElement.parentNode.insertBefore(widget, targetElement.nextSibling);
+          targetElement.parentNode.insertBefore(
+            widget,
+            targetElement.nextSibling,
+          );
         } else {
           targetElement.appendChild(widget);
         }
@@ -225,6 +240,57 @@ export class WidgetController {
     return this.emojiWidget;
   }
 
+  /**
+   * Initialize QuickJump widget (GPT only for now)
+   */
+  initQuickJump() {
+    console.log("[WidgetController] initQuickJump() called");
+
+    // Only init if not already present
+    if (this.quickJumpWidget) {
+      console.log("[WidgetController] QuickJump already exists, skipping");
+      return;
+    }
+
+    // Check if we're on a GPT page (provider check)
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    console.log(
+      "[WidgetController] Hostname:",
+      window.location.hostname,
+      "isGPT:",
+      isGPT,
+    );
+
+    if (!isGPT) {
+      console.log("[WidgetController] Not GPT page, skipping QuickJump");
+      this.logDebug("quickjump:skipped", { detail: { reason: "not-gpt" } });
+      return;
+    }
+
+    console.log("[WidgetController] Creating QuickJumpWidget...");
+    this.quickJumpWidget = new QuickJumpWidget({
+      document: document,
+      maxDots: 20,
+    });
+    this.quickJumpWidget.attach();
+    console.log("[WidgetController] QuickJumpWidget attached");
+    this.logDebug("quickjump:initialized");
+  }
+
+  /**
+   * Destroy QuickJump widget
+   */
+  destroyQuickJump() {
+    if (this.quickJumpWidget) {
+      this.quickJumpWidget.destroy();
+      this.quickJumpWidget = null;
+      this.logDebug("quickjump:destroyed");
+    }
+  }
+
   destroyWidget() {
     if (this.widgetElement && this.widgetElement.parentNode) {
       this.widgetElement.remove();
@@ -234,6 +300,7 @@ export class WidgetController {
       this.emojiWidget.close();
       this.emojiWidget = null;
     }
+    this.destroyQuickJump();
     this.retryManager.cancel();
   }
 

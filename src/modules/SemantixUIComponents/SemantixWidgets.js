@@ -9,9 +9,7 @@ export const SemantixWidgets = () => {
         <button type="button" class="semantix-widgets__emoji" data-widget-action="emoji" aria-label="Open emoji picker">
           🙂
         </button>
-        <button type="button" class="semantix-widget-btn ghost" data-widget-action="import">
-          Import chat
-        </button>
+
       </div>
     </div>
   `;

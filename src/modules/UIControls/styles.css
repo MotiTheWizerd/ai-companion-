@@ -164,7 +164,7 @@
 }
 
 .semantix-widgets__emoji {
-    font-size: 20px;
+    font-size: 16px;
     line-height: 1;
     border: none;
     background: transparent;
@@ -172,10 +172,6 @@
     padding: 4px;
     border-radius: 50%;
     transition: background 0.2s ease;
-}
-
-.semantix-widgets__emoji:hover {
-    background: rgba(255, 255, 255, 0.1);
 }
 
 .semantix-widget-btn {
