@@ -3,6 +3,7 @@ import { eventBus } from "../../content/core/eventBus.js";
 import { EmojiWidget } from "../widgets/emoji-widget/EmojiWidget.js";
 import { QuickJumpWidget } from "../widgets/quick-jump-widget/QuickJumpWidget.js";
 import { RTLDetectWidget } from "../widgets/rtl-detect-widget/RTLDetectWidget.js";
+import { ReflectionSlotWidget } from "../widgets/reflection-slot-widget/ReflectionSlotWidget.js";
 import { RetryManager } from "./utils/RetryManager.js";
 
 /**
@@ -18,6 +19,7 @@ export class WidgetController {
     this.emojiWidget = null;
     this.quickJumpWidget = null;
     this.rtlDetectWidget = null;
+    this.reflectionSlotWidget = null;
   }
 
   init() {
@@ -55,6 +57,8 @@ export class WidgetController {
     this.initQuickJump();
     // Try to init RTL detection
     this.initRTLDetect();
+    // Try to init ReflectionSlot
+    this.initReflectionSlot();
 
     if (this.widgetElement && document.body.contains(this.widgetElement)) {
       return;
@@ -69,6 +73,9 @@ export class WidgetController {
     // Re-initialize QuickJump for new conversation
     this.destroyQuickJump();
     this.initQuickJump();
+    // Re-initialize ReflectionSlot for new conversation
+    this.destroyReflectionSlot();
+    this.initReflectionSlot();
   }
 
   tryInjectWithRetry(reason = "manual") {
@@ -339,6 +346,72 @@ export class WidgetController {
     }
   }
 
+  /**
+   * Initialize ReflectionSlot widget (GPT only for now)
+   */
+  initReflectionSlot() {
+    console.log("[WidgetController] initReflectionSlot() called");
+
+    // Only init if not already present
+    if (this.reflectionSlotWidget) {
+      console.log("[WidgetController] ReflectionSlot already exists, skipping");
+      return;
+    }
+
+    // Check if we're on a GPT page (provider check)
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    if (!isGPT) {
+      console.log("[WidgetController] Not GPT page, skipping ReflectionSlot");
+      this.logDebug("reflectionslot:skipped", {
+        detail: { reason: "not-gpt" },
+      });
+      return;
+    }
+
+    console.log("[WidgetController] Creating ReflectionSlotWidget...");
+    this.reflectionSlotWidget = new ReflectionSlotWidget({
+      document: document,
+      onSlotCreated: ({ slotElement, messageElement, messageId }) => {
+        console.log(
+          "[WidgetController] ReflectionSlot created for message:",
+          messageId,
+        );
+        this.logDebug("reflectionslot:slot-created", { detail: { messageId } });
+      },
+      onSlotRemoved: ({ messageId }) => {
+        console.log(
+          "[WidgetController] ReflectionSlot removed for message:",
+          messageId,
+        );
+        this.logDebug("reflectionslot:slot-removed", { detail: { messageId } });
+      },
+    });
+    this.reflectionSlotWidget.attach();
+    console.log("[WidgetController] ReflectionSlotWidget attached");
+    this.logDebug("reflectionslot:initialized");
+  }
+
+  /**
+   * Destroy ReflectionSlot widget
+   */
+  destroyReflectionSlot() {
+    if (this.reflectionSlotWidget) {
+      this.reflectionSlotWidget.destroy();
+      this.reflectionSlotWidget = null;
+      this.logDebug("reflectionslot:destroyed");
+    }
+  }
+
+  /**
+   * Get ReflectionSlot widget instance (for external access)
+   */
+  getReflectionSlotWidget() {
+    return this.reflectionSlotWidget;
+  }
+
   destroyWidget() {
     if (this.widgetElement && this.widgetElement.parentNode) {
       this.widgetElement.remove();
@@ -350,6 +423,7 @@ export class WidgetController {
     }
     this.destroyQuickJump();
     this.destroyRTLDetect();
+    this.destroyReflectionSlot();
     this.retryManager.cancel();
   }
 
