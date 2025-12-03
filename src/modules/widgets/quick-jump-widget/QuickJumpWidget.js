@@ -20,8 +20,8 @@ const PANEL_STYLES = `
   align-items: center;
   gap: 12px;
   padding: 12px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 20px;
+
+  border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(12px);
   z-index: 99998;
@@ -31,7 +31,7 @@ const PANEL_STYLES = `
 }
 
 .semantix-quickjump--visible {
-  opacity: 1;
+  opacity: .8;
   pointer-events: auto;
 }
 

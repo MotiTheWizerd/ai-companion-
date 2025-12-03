@@ -68,15 +68,13 @@
     /* Appearance */
     background-color: rgba(20, 20, 20, 0.95);
     color: #e0e0e0;
-    padding: 6px 16px;
-    border-radius: 20px;
+    padding: 6px;
+    border-radius: 7px;
     font-family:
         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
         sans-serif;
     font-size: 13px;
     font-weight: 500;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.15);
 
     /* Flex layout */
     display: flex;
@@ -87,13 +85,6 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(8px);
     pointer-events: auto;
-}
-
-.semantix-header-toolbar:hover {
-    background-color: rgba(30, 30, 30, 1);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    border-color: rgba(255, 255, 255, 0.25);
-    transform: translateX(-50%) translateY(1px);
 }
 
 .semantix-status-dot {
@@ -125,6 +116,50 @@
     font-size: 12px;
     padding-left: 4px;
     border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Project Dropdown in Toolbar */
+.semantix-project-dropdown {
+    background-color: rgba(20, 20, 20, 0.95);
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 7px;
+    padding: 2px 22px 2px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    min-width: 120px;
+    max-width: 180px;
+
+    /* Custom dropdown arrow */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23808080' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 10px;
+}
+
+.semantix-project-dropdown:focus {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.semantix-project-dropdown:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.semantix-project-dropdown option {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    padding: 8px;
+}
+
+.semantix-project-dropdown option:checked {
+    background-color: rgba(76, 175, 80, 0.3);
 }
 
 .semantix-settings-icon {

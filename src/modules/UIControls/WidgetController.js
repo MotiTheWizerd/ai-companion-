@@ -2,6 +2,7 @@ import { SemantixWidgets } from "../SemantixUIComponents/index.js";
 import { eventBus } from "../../content/core/eventBus.js";
 import { EmojiWidget } from "../widgets/emoji-widget/EmojiWidget.js";
 import { QuickJumpWidget } from "../widgets/quick-jump-widget/QuickJumpWidget.js";
+import { RTLDetectWidget } from "../widgets/rtl-detect-widget/RTLDetectWidget.js";
 import { RetryManager } from "./utils/RetryManager.js";
 
 /**
@@ -16,6 +17,7 @@ export class WidgetController {
     this.lifecycleHandlers = null;
     this.emojiWidget = null;
     this.quickJumpWidget = null;
+    this.rtlDetectWidget = null;
   }
 
   init() {
@@ -51,6 +53,8 @@ export class WidgetController {
     this.logDebug("lifecycle:host-mutation", { detail });
     // Try to init QuickJump if not already initialized
     this.initQuickJump();
+    // Try to init RTL detection
+    this.initRTLDetect();
 
     if (this.widgetElement && document.body.contains(this.widgetElement)) {
       return;
@@ -291,6 +295,50 @@ export class WidgetController {
     }
   }
 
+  /**
+   * Initialize RTL Detect widget (GPT only for now)
+   */
+  initRTLDetect() {
+    console.log("[WidgetController] initRTLDetect() called");
+
+    // Only init if not already present
+    if (this.rtlDetectWidget) {
+      console.log("[WidgetController] RTLDetect already exists, skipping");
+      return;
+    }
+
+    // Check if we're on a GPT page (provider check)
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    if (!isGPT) {
+      console.log("[WidgetController] Not GPT page, skipping RTLDetect");
+      this.logDebug("rtldetect:skipped", { detail: { reason: "not-gpt" } });
+      return;
+    }
+
+    console.log("[WidgetController] Creating RTLDetectWidget...");
+    this.rtlDetectWidget = new RTLDetectWidget({
+      document: document,
+      inputSelector: "#prompt-textarea",
+    });
+    this.rtlDetectWidget.attach();
+    console.log("[WidgetController] RTLDetectWidget attached");
+    this.logDebug("rtldetect:initialized");
+  }
+
+  /**
+   * Destroy RTL Detect widget
+   */
+  destroyRTLDetect() {
+    if (this.rtlDetectWidget) {
+      this.rtlDetectWidget.destroy();
+      this.rtlDetectWidget = null;
+      this.logDebug("rtldetect:destroyed");
+    }
+  }
+
   destroyWidget() {
     if (this.widgetElement && this.widgetElement.parentNode) {
       this.widgetElement.remove();
@@ -301,6 +349,7 @@ export class WidgetController {
       this.emojiWidget = null;
     }
     this.destroyQuickJump();
+    this.destroyRTLDetect();
     this.retryManager.cancel();
   }
 
