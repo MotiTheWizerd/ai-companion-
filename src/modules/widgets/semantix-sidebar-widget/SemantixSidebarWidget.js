@@ -150,18 +150,60 @@ const WIDGET_STYLES = `
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px 6px 12px;
+  padding: 6px 12px 6px 8px;
   color: var(--text-secondary, #8e8e8e);
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.semantix-favorites-header:hover {
+  background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.03));
 }
 
 .semantix-favorites-header svg {
   width: 14px;
   height: 14px;
   opacity: 0.7;
+}
+
+/* Favorites section chevron */
+.semantix-favorites-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary, #8e8e8e);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.semantix-favorites-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.semantix-favorites-section.expanded .semantix-favorites-chevron {
+  transform: rotate(90deg);
+}
+
+/* Favorites content collapse */
+.semantix-favorites-content {
+  overflow: hidden;
+  transition: max-height 0.2s ease, opacity 0.2s ease;
+  max-height: 0;
+  opacity: 0;
+}
+
+.semantix-favorites-section.expanded .semantix-favorites-content {
+  max-height: 2000px;
+  opacity: 1;
 }
 
 /* Add folder button in header */
@@ -194,10 +236,7 @@ const WIDGET_STYLES = `
   opacity: 1;
 }
 
-.semantix-favorites-content {
-  display: flex;
-  flex-direction: column;
-}
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FAVORITE ITEM STYLES
@@ -700,8 +739,9 @@ export class SemantixSidebarWidget {
       </div>
       <div class="${CLASSES.MENU}">
         <!-- Favorites Section -->
-        <div class="semantix-favorites-section">
-          <div class="semantix-favorites-header">
+        <div class="semantix-favorites-section expanded" data-section="favorites">
+          <div class="semantix-favorites-header" data-action="toggle-section">
+            <span class="semantix-favorites-chevron">${ICONS.chevronRight}</span>
             ${ICONS.star}
             <span>Favorites</span>
             <span class="semantix-sidebar-badge semantix-favorites-badge" style="${favoritesCount > 0 ? "" : "display:none"}">${favoritesCount}</span>
@@ -758,6 +798,90 @@ export class SemantixSidebarWidget {
           await this.handleCreateFolder();
         }
       });
+    }
+
+    // Favorites section header click (toggle collapse)
+    const favoritesHeader = this.sectionElement.querySelector(
+      ".semantix-favorites-header",
+    );
+    if (favoritesHeader) {
+      favoritesHeader.addEventListener("click", (e) => {
+        // Don't toggle if clicking on add folder button
+        if (e.target.closest(".semantix-add-folder-btn")) {
+          return;
+        }
+        this.toggleFavoritesSection();
+      });
+    }
+
+    // Load favorites section collapsed state
+    this.loadFavoritesSectionState();
+  }
+
+  /**
+   * Toggle favorites section collapsed state
+   */
+  toggleFavoritesSection() {
+    const section = this.sectionElement?.querySelector(
+      ".semantix-favorites-section",
+    );
+    if (!section) return;
+
+    const isExpanded = section.classList.contains("expanded");
+
+    if (isExpanded) {
+      section.classList.remove("expanded");
+    } else {
+      section.classList.add("expanded");
+    }
+
+    // Save state
+    this.saveFavoritesSectionState(!isExpanded);
+  }
+
+  /**
+   * Load favorites section collapsed state from storage
+   */
+  loadFavoritesSectionState() {
+    try {
+      const stored = localStorage.getItem(
+        "semantix_favorites_section_expanded",
+      );
+      const isExpanded = stored === null ? true : stored === "true";
+
+      const section = this.sectionElement?.querySelector(
+        ".semantix-favorites-section",
+      );
+      if (section) {
+        if (isExpanded) {
+          section.classList.add("expanded");
+        } else {
+          section.classList.remove("expanded");
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "[SemantixSidebarWidget] Failed to load favorites section state:",
+        error,
+      );
+    }
+  }
+
+  /**
+   * Save favorites section collapsed state to storage
+   * @param {boolean} isExpanded
+   */
+  saveFavoritesSectionState(isExpanded) {
+    try {
+      localStorage.setItem(
+        "semantix_favorites_section_expanded",
+        isExpanded ? "true" : "false",
+      );
+    } catch (error) {
+      console.warn(
+        "[SemantixSidebarWidget] Failed to save favorites section state:",
+        error,
+      );
     }
   }
 
