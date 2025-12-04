@@ -282,16 +282,22 @@ export class FolderTreeRenderer {
   renderProjectItem(item) {
     const iconKey = item.icon || "folder";
     const projectIcon = ICONS[iconKey] || ICONS.folder;
+    const isSelected = this.selectedFolderId === `project_${item.id}`;
+    const selectedClass = isSelected ? "semantix-project-item--selected" : "";
 
     return `
-      <div class="semantix-project-item"
+      <div class="semantix-project-item ${selectedClass}"
            data-project-id="${item.id}"
            data-folder-id="${item.folderId || ""}"
            title="${this.escapeHtml(item.name)}"
            draggable="true">
         <span class="semantix-project-icon" style="color: ${item.color || "#6b7280"}">${projectIcon}</span>
         <span class="semantix-project-name" data-project-id="${item.id}">${this.escapeHtml(item.name)}</span>
+        ${isSelected ? `<span class="semantix-project-selected-badge">✓</span>` : ""}
         <div class="semantix-project-actions">
+          <button class="semantix-project-action-btn" data-action="select-project" data-project-id="${item.id}" title="Select for new items">
+            ${ICONS.check}
+          </button>
           <button class="semantix-project-action-btn" data-action="project-menu" data-project-id="${item.id}" title="More options">
             ${ICONS.moreHorizontal}
           </button>
@@ -418,6 +424,8 @@ export class FolderTreeRenderer {
           const action = btn.dataset.action;
           if (action === "project-menu" && projectId) {
             this.showProjectContextMenu(projectId, e);
+          } else if (action === "select-project" && projectId) {
+            this.selectProject(projectId);
           }
         });
       });
@@ -911,6 +919,28 @@ export class FolderTreeRenderer {
     if (this.itemType === "project") {
       this.startProjectRename(projectId);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PROJECT SELECTION
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Select a project (new items will be added here)
+   * @param {string} projectId
+   */
+  async selectProject(projectId) {
+    // Use a special prefix to distinguish project selection from folder selection
+    const selectionId = `project_${projectId}`;
+    this.selectedFolderId = selectionId;
+    await this.favoritesManager.setSelectedFolder(selectionId);
+
+    // Update UI
+    await this.refreshStructure();
+
+    // Show toast
+    const project = await this.favoritesManager.get(projectId);
+    this.showToast(`"${project?.name || "Project"}" selected`, "success");
   }
 
   // ─────────────────────────────────────────────────────────────────────────

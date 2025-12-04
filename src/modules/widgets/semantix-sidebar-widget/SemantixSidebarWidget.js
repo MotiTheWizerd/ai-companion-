@@ -354,7 +354,46 @@ const WIDGET_STYLES = `
   height: 14px;
 }
 
+/* Select button visibility */
+.semantix-project-action-btn[data-action="select-project"] {
+  opacity: 0;
+}
 
+.semantix-project-item:hover .semantix-project-action-btn[data-action="select-project"] {
+  opacity: 1;
+}
+
+.semantix-project-item--selected .semantix-project-action-btn[data-action="select-project"] {
+  opacity: 1;
+  color: #10a37f;
+}
+
+/* Selected project state */
+.semantix-project-item--selected {
+  background-color: rgba(16, 163, 127, 0.1);
+  border: 1px solid rgba(16, 163, 127, 0.3);
+  border-radius: 6px;
+}
+
+.semantix-project-item--selected .semantix-project-name {
+  color: #10a37f;
+  font-weight: 500;
+}
+
+.semantix-project-selected-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: #10a37f;
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    FAVORITE ITEM STYLES
