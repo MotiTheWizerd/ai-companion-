@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 function App() {
   const [status, setStatus] = useState("Ready");
   const [platform, setPlatform] = useState(null);
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
 
   useEffect(() => {
     // Query active tab and detect platform
@@ -23,7 +24,19 @@ function App() {
         setPlatform(null);
       }
     });
+
+    // Load memory fetch setting from storage
+    chrome.storage.local.get(["memoryFetchEnabled"], (result) => {
+      // Default to true if not set
+      setMemoryEnabled(result.memoryFetchEnabled !== false);
+    });
   }, []);
+
+  const handleMemoryToggle = () => {
+    const newValue = !memoryEnabled;
+    setMemoryEnabled(newValue);
+    chrome.storage.local.set({ memoryFetchEnabled: newValue });
+  };
 
   return (
     <div className="container">
@@ -42,6 +55,30 @@ function App() {
           </p>
         )}
       </div>
+
+      {platform && (
+        <div className="settings-section">
+          <div className="setting-row">
+            <div className="setting-info">
+              <span className="setting-icon">🧠</span>
+              <div className="setting-text">
+                <span className="setting-label">Memory Fetch</span>
+                <span className="setting-description">
+                  Inject context from semantic memory
+                </span>
+              </div>
+            </div>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={memoryEnabled}
+                onChange={handleMemoryToggle}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,12 @@
-import { BaseProvider } from '../base/BaseProvider.js';
-import { ClaudeStreamParser } from './ClaudeStreamParser.js';
-import { ClaudeURLMatcher } from './ClaudeURLMatcher.js';
-import { CLAUDE_CONFIG } from './claude.config.js';
-import { API_CONFIG } from '../../../content/core/constants.js';
-import { getProjectIdFromStorage } from '../../../content/modules/utils/storageUtils.js';
+import { BaseProvider } from "../base/BaseProvider.js";
+import { ClaudeStreamParser } from "./ClaudeStreamParser.js";
+import { ClaudeURLMatcher } from "./ClaudeURLMatcher.js";
+import { CLAUDE_CONFIG } from "./claude.config.js";
+import { API_CONFIG } from "../../../content/core/constants.js";
+import {
+  getProjectIdFromStorage,
+  getMemoryFetchEnabled,
+} from "../../../content/modules/utils/storageUtils.js";
 
 /**
  * Claude provider implementation
@@ -17,7 +20,7 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   getName() {
-    return 'claude';
+    return "claude";
   }
 
   getStreamParser() {
@@ -34,25 +37,40 @@ export class ClaudeProvider extends BaseProvider {
    * @returns {Object} Modified request body
    */
   async handleRequest(body, context = {}) {
-    console.log('[ClaudeProvider] handleRequest called', body);
+    console.log("[ClaudeProvider] handleRequest called", body);
     try {
       const sessionId = context?.conversationId || null;
+
+      // Check if memory fetch is enabled
+      const memoryFetchEnabled = await getMemoryFetchEnabled();
+      console.log("[ClaudeProvider] Memory fetch enabled:", memoryFetchEnabled);
+
+      if (!memoryFetchEnabled) {
+        console.log(
+          "[ClaudeProvider] Memory fetch disabled, skipping memory injection",
+        );
+        return body;
+      }
 
       // Check for Claude's prompt field
       if (body?.prompt) {
         const currentText = body.prompt;
-        console.log('[ClaudeProvider] Current prompt:', currentText);
+        console.log("[ClaudeProvider] Current prompt:", currentText);
 
         // Only modify if we have actual text
-        if (typeof currentText === 'string' && currentText.trim().length > 0) {
+        if (typeof currentText === "string" && currentText.trim().length > 0) {
           try {
-            console.log('[ClaudeProvider] Requesting memory search via background...');
-            console.log('[ClaudeProvider] Project ID: (Waiting for Loader injection)');
+            console.log(
+              "[ClaudeProvider] Requesting memory search via background...",
+            );
+            console.log(
+              "[ClaudeProvider] Project ID: (Waiting for Loader injection)",
+            );
 
             // Send API request through background script (bypasses CSP)
             const searchResults = await this.sendBackgroundRequest({
-              method: 'POST',
-              endpoint: '/conversations/fetch-memory',
+              method: "POST",
+              endpoint: "/conversations/fetch-memory",
               data: {
                 query: currentText,
                 user_id: API_CONFIG.USER_ID,
@@ -60,38 +78,48 @@ export class ClaudeProvider extends BaseProvider {
                 session_id: sessionId,
                 limit: 5,
                 min_similarity: 0.5,
-              }
+              },
             });
 
-            console.log('[ClaudeProvider] Search results:', searchResults.synthesized_memory);
+            console.log(
+              "[ClaudeProvider] Search results:",
+              searchResults.synthesized_memory,
+            );
 
-            if (searchResults.synthesized_memory && searchResults.synthesized_memory.length > 0) {
+            if (
+              searchResults.synthesized_memory &&
+              searchResults.synthesized_memory.length > 0
+            ) {
               // Format the results into a string
               const memoryContent = searchResults.synthesized_memory;
               // Construct the memory block
               const memoryBlock =
                 "[semantix-memory-block]\n" +
-                memoryContent + "\n" +
+                memoryContent +
+                "\n" +
                 "[semantix-end-memory-block]\n\n";
 
-              console.log('[ClaudeProvider] Memory block:', memoryBlock);
+              console.log("[ClaudeProvider] Memory block:", memoryBlock);
 
               // Prepend memory block to the user's prompt
               body.prompt = memoryBlock + currentText;
-              console.log('[ClaudeProvider] Modified prompt:', body.prompt);
+              console.log("[ClaudeProvider] Modified prompt:", body.prompt);
             } else {
-              console.log('[ClaudeProvider] No search results found');
+              console.log("[ClaudeProvider] No search results found");
             }
           } catch (apiError) {
-            console.warn('[ClaudeProvider] Failed to fetch memory context:', apiError);
+            console.warn(
+              "[ClaudeProvider] Failed to fetch memory context:",
+              apiError,
+            );
             // Fallback to no memory injection on error
           }
         }
       }
     } catch (error) {
-      console.warn('[ClaudeProvider] Failed to modify request:', error);
+      console.warn("[ClaudeProvider] Failed to modify request:", error);
     }
-    console.log('[ClaudeProvider] Returning body:', body);
+    console.log("[ClaudeProvider] Returning body:", body);
     return body;
   }
 
@@ -108,33 +136,37 @@ export class ClaudeProvider extends BaseProvider {
       // Listen for response
       const responseHandler = (event) => {
         if (event.source !== window) return;
-        if (!event.data || event.data.source !== 'chatgpt-extension-response') return;
-        if (event.data.type !== 'API_REQUEST') return;
+        if (!event.data || event.data.source !== "chatgpt-extension-response")
+          return;
+        if (event.data.type !== "API_REQUEST") return;
 
         // Remove listener
-        window.removeEventListener('message', responseHandler);
+        window.removeEventListener("message", responseHandler);
 
         if (event.data.success) {
           resolve(event.data.data);
         } else {
-          reject(new Error(event.data.error || 'API request failed'));
+          reject(new Error(event.data.error || "API request failed"));
         }
       };
 
-      window.addEventListener('message', responseHandler);
+      window.addEventListener("message", responseHandler);
 
       // Send request to background via loader
-      window.postMessage({
-        source: 'chatgpt-extension',
-        type: 'API_REQUEST',
-        request: request,
-        requestId: requestId
-      }, '*');
+      window.postMessage(
+        {
+          source: "chatgpt-extension",
+          type: "API_REQUEST",
+          request: request,
+          requestId: requestId,
+        },
+        "*",
+      );
 
       // Timeout after 30 seconds
       setTimeout(() => {
-        window.removeEventListener('message', responseHandler);
-        reject(new Error('Memory search timeout'));
+        window.removeEventListener("message", responseHandler);
+        reject(new Error("Memory search timeout"));
       }, 60000);
     });
   }

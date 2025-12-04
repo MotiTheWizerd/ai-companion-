@@ -399,26 +399,16 @@ export class ToolbarController {
       selectedProjectName: newValue ? selectedLabel || newValue : null,
     };
 
-    // Save to chrome.storage
-    if (this.canUseChromeStorage()) {
-      try {
-        chrome.storage.local.set(payload, () => {
-          if (chrome.runtime?.lastError) {
-            console.error(
-              "[ToolbarController] Error saving selected project:",
-              chrome.runtime.lastError,
-            );
-          } else {
-            this.logDebug("storage:saved-selection", payload);
-          }
-        });
-      } catch (error) {
-        console.error(
-          "[ToolbarController] Failed to save selected project:",
-          error,
-        );
-      }
-    }
+    // Save via postMessage bridge (works in page context where chrome.storage is not available)
+    window.postMessage(
+      {
+        source: "chatgpt-extension",
+        type: "SAVE_PROJECT_SELECTION",
+        data: payload,
+      },
+      "*",
+    );
+    this.logDebug("storage:save-via-bridge", payload);
   }
 
   updateDropdownOptions() {

@@ -174,3 +174,99 @@ h1 {
     font-size: 11px;
     font-weight: 500;
 }
+
+/* Settings Section */
+.settings-section {
+    margin-top: 16px;
+    background: #252525;
+    border-radius: 8px;
+    padding: 12px 16px;
+    border: 1px solid #333;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.setting-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.setting-icon {
+    font-size: 18px;
+}
+
+.setting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.setting-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #e0e0e0;
+}
+
+.setting-description {
+    font-size: 11px;
+    color: #808080;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #404040;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.toggle-slider::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #808080;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #4fd1c5, #7873f5);
+    box-shadow: 0 0 10px rgba(79, 209, 197, 0.4);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+    background-color: #ffffff;
+}
+
+.toggle-switch input:focus + .toggle-slider {
+    box-shadow: 0 0 2px rgba(79, 209, 197, 0.6);
+}

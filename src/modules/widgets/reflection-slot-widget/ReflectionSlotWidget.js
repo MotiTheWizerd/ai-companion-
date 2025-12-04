@@ -3,6 +3,7 @@ import {
   CONFIG,
   SLOT_STATES,
   SLOT_CLASSES,
+  MEMORY_BLOCK,
 } from "./constants.js";
 
 /**
@@ -206,6 +207,37 @@ export class ReflectionSlotWidget {
         trackingId,
       );
 
+      // --- MEMORY BLOCK EXTRACTION ---
+      // Step A: Find the previous user message
+      const userMessage = this.findPreviousUserMessage(messageElement);
+
+      if (userMessage) {
+        console.log("[ReflectionSlotWidget] Found previous user message");
+
+        // Step B: Extract memory block content
+        const memoryContent = this.extractMemoryBlock(userMessage);
+
+        if (memoryContent) {
+          console.log(
+            "[ReflectionSlotWidget] Extracted memory block:",
+            memoryContent.substring(0, 50) + "...",
+          );
+
+          // Step C: Remove memory block from user message DOM
+          this.removeMemoryBlockFromDOM(userMessage);
+
+          // Step D: Inject content into the slot
+          slot.textContent = memoryContent;
+          this.setSlotState(slot, SLOT_STATES.READY);
+        } else {
+          console.log(
+            "[ReflectionSlotWidget] No memory block found in user message",
+          );
+        }
+      } else {
+        console.log("[ReflectionSlotWidget] No previous user message found");
+      }
+
       // Trigger callback if provided
       if (this.onSlotCreated) {
         this.onSlotCreated({
@@ -232,6 +264,132 @@ export class ReflectionSlotWidget {
     slot.setAttribute("aria-label", "Reflection content for assistant message");
 
     return slot;
+  }
+
+  /**
+   * Step A: Find the previous user message before an assistant message
+   */
+  findPreviousUserMessage(assistantElement) {
+    // Get all messages in the document
+    const allMessages = Array.from(
+      this.documentRef.querySelectorAll(GPT_SELECTORS.ALL_MESSAGES),
+    );
+
+    // Find the index of our assistant message
+    const assistantIndex = allMessages.indexOf(assistantElement);
+
+    if (assistantIndex <= 0) {
+      return null;
+    }
+
+    // Walk backwards to find the previous user message
+    for (let i = assistantIndex - 1; i >= 0; i--) {
+      const msg = allMessages[i];
+      if (msg.getAttribute("data-message-author-role") === "user") {
+        return msg;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Step B: Extract content between memory block tags from user message
+   */
+  extractMemoryBlock(userMessageElement) {
+    // Get the text content of the user message
+    const textContent = userMessageElement.textContent || "";
+
+    console.log("[ReflectionSlotWidget] User message text:", textContent);
+    console.log(
+      "[ReflectionSlotWidget] Looking for START_TAG:",
+      MEMORY_BLOCK.START_TAG,
+    );
+    console.log(
+      "[ReflectionSlotWidget] Looking for END_TAG:",
+      MEMORY_BLOCK.END_TAG,
+    );
+
+    const startIndex = textContent.indexOf(MEMORY_BLOCK.START_TAG);
+    const endIndex = textContent.indexOf(MEMORY_BLOCK.END_TAG);
+
+    console.log(
+      "[ReflectionSlotWidget] startIndex:",
+      startIndex,
+      "endIndex:",
+      endIndex,
+    );
+
+    // Check if both tags exist and are in correct order
+    if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+      console.log("[ReflectionSlotWidget] Tags not found or in wrong order");
+      return null;
+    }
+
+    // Extract content between the tags
+    const contentStart = startIndex + MEMORY_BLOCK.START_TAG.length;
+    const content = textContent.substring(contentStart, endIndex).trim();
+
+    console.log("[ReflectionSlotWidget] Extracted content:", content);
+
+    return content;
+  }
+
+  /**
+   * Step C: Remove the memory block from user message DOM
+   */
+  removeMemoryBlockFromDOM(userMessageElement) {
+    // We need to find and modify the text nodes that contain the memory block
+    const walker = this.documentRef.createTreeWalker(
+      userMessageElement,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false,
+    );
+
+    let fullText = "";
+    const textNodes = [];
+
+    // Collect all text nodes and their content
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node);
+      fullText += node.textContent;
+    }
+
+    // Find the memory block in the full text
+    const startIndex = fullText.indexOf(MEMORY_BLOCK.START_TAG);
+    const endIndex = fullText.indexOf(MEMORY_BLOCK.END_TAG);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return false;
+    }
+
+    const blockEndIndex = endIndex + MEMORY_BLOCK.END_TAG.length;
+
+    // Calculate what text to keep
+    const textBefore = fullText.substring(0, startIndex);
+    const textAfter = fullText.substring(blockEndIndex);
+    const newText = (textBefore + textAfter).trim();
+
+    // Simple approach: clear all text nodes and set new content in the first one
+    if (textNodes.length > 0) {
+      // Find the main content container (usually a <p> or the message itself)
+      const contentContainer =
+        userMessageElement.querySelector(".whitespace-pre-wrap") ||
+        userMessageElement.querySelector("p") ||
+        userMessageElement;
+
+      if (contentContainer) {
+        contentContainer.textContent = newText;
+        console.log(
+          "[ReflectionSlotWidget] Removed memory block from user message",
+        );
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
