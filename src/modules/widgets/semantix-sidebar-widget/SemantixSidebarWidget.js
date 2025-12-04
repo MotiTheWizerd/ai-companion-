@@ -5,7 +5,10 @@ import {
   ICONS,
   CLASSES,
 } from "./constants.js";
-import { getFavoritesManager } from "../../SemantixStorage/index.js";
+import {
+  getFavoritesManager,
+  getProjectsManager,
+} from "../../SemantixStorage/index.js";
 import { FolderTreeRenderer } from "./FolderTreeRenderer.js";
 import { FOLDER_STYLES } from "./folderStyles.js";
 
@@ -138,15 +141,15 @@ const WIDGET_STYLES = `
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FAVORITES SECTION STYLES
+   SECTION STYLES (Favorites, Projects, etc.)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.semantix-favorites-section {
+.semantix-section-item {
   margin-top: 4px;
   padding-top: 4px;
 }
 
-.semantix-favorites-header {
+.semantix-section-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -162,18 +165,18 @@ const WIDGET_STYLES = `
   user-select: none;
 }
 
-.semantix-favorites-header:hover {
+.semantix-section-header:hover {
   background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.03));
 }
 
-.semantix-favorites-header svg {
+.semantix-section-header svg {
   width: 14px;
   height: 14px;
   opacity: 0.7;
 }
 
-/* Favorites section chevron */
-.semantix-favorites-chevron {
+/* Section chevron */
+.semantix-section-chevron {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -184,30 +187,30 @@ const WIDGET_STYLES = `
   flex-shrink: 0;
 }
 
-.semantix-favorites-chevron svg {
+.semantix-section-chevron svg {
   width: 12px;
   height: 12px;
 }
 
-.semantix-favorites-section.expanded .semantix-favorites-chevron {
+.semantix-section-item.expanded .semantix-section-chevron {
   transform: rotate(90deg);
 }
 
-/* Favorites content collapse */
-.semantix-favorites-content {
+/* Section content collapse */
+.semantix-section-content {
   overflow: hidden;
   transition: max-height 0.2s ease, opacity 0.2s ease;
   max-height: 0;
   opacity: 0;
 }
 
-.semantix-favorites-section.expanded .semantix-favorites-content {
+.semantix-section-item.expanded .semantix-section-content {
   max-height: 2000px;
   opacity: 1;
 }
 
-/* Add folder button in header */
-.semantix-add-folder-btn {
+/* Add button in header (folder or item) */
+.semantix-add-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,16 +227,131 @@ const WIDGET_STYLES = `
   transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
-.semantix-add-folder-btn:hover {
+.semantix-add-btn:hover {
   background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.1));
   color: #10a37f;
   opacity: 1;
 }
 
-.semantix-add-folder-btn svg {
+.semantix-add-btn svg {
   width: 14px;
   height: 14px;
   opacity: 1;
+}
+
+/* Loading state */
+.semantix-loading {
+  padding: 12px 16px;
+  color: var(--text-secondary, #8e8e8e);
+  font-size: 13px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Project item styles */
+.semantix-project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+  color: var(--text-primary, #ececec);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.semantix-project-item:hover {
+  background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.05));
+}
+
+.semantix-project-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.semantix-project-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.semantix-project-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.semantix-project-remove {
+  opacity: 0;
+  color: var(--text-secondary, #8e8e8e);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.semantix-project-item:hover .semantix-project-remove {
+  opacity: 1;
+}
+
+.semantix-project-remove:hover {
+  color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.semantix-project-remove svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Project actions (menu button) */
+.semantix-project-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  margin-left: auto;
+}
+
+.semantix-project-item:hover .semantix-project-actions {
+  opacity: 1;
+}
+
+.semantix-project-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-secondary, #8e8e8e);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  padding: 0;
+}
+
+.semantix-project-action-btn:hover {
+  background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.1));
+  color: var(--text-primary, #ececec);
+}
+
+.semantix-project-action-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 
@@ -346,8 +464,15 @@ export class SemantixSidebarWidget {
     this.favorites = [];
     this.favoritesManager = null;
     this.favoritesUnsubscribe = null;
-    this.foldersUnsubscribe = null;
-    this.folderTreeRenderer = null;
+    this.favoritesFoldersUnsubscribe = null;
+    this.favoritesTreeRenderer = null;
+
+    // Projects state
+    this.projects = [];
+    this.projectsManager = null;
+    this.projectsUnsubscribe = null;
+    this.projectsFoldersUnsubscribe = null;
+    this.projectsTreeRenderer = null;
 
     // Event handlers bound to this instance
     this.handleHeaderClick = this.handleHeaderClick.bind(this);
@@ -355,7 +480,13 @@ export class SemantixSidebarWidget {
     this.handleFavoriteClick = this.handleFavoriteClick.bind(this);
     this.handleFavoriteRemove = this.handleFavoriteRemove.bind(this);
     this.handleFavoritesChange = this.handleFavoritesChange.bind(this);
-    this.handleFoldersChange = this.handleFoldersChange.bind(this);
+    this.handleFavoritesFoldersChange =
+      this.handleFavoritesFoldersChange.bind(this);
+    this.handleProjectClick = this.handleProjectClick.bind(this);
+    this.handleProjectRemove = this.handleProjectRemove.bind(this);
+    this.handleProjectsChange = this.handleProjectsChange.bind(this);
+    this.handleProjectsFoldersChange =
+      this.handleProjectsFoldersChange.bind(this);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -371,6 +502,9 @@ export class SemantixSidebarWidget {
     // Initialize FavoritesManager
     this.favoritesManager = getFavoritesManager({ provider: "chatgpt" });
 
+    // Initialize ProjectsManager
+    this.projectsManager = getProjectsManager();
+
     // Load collapsed state from storage
     await this.loadCollapsedState();
 
@@ -382,9 +516,25 @@ export class SemantixSidebarWidget {
       this.handleFavoritesChange,
     );
 
-    // Subscribe to folder changes
-    const foldersManager = this.favoritesManager.getFoldersManager();
-    this.foldersUnsubscribe = foldersManager.onChange(this.handleFoldersChange);
+    // Subscribe to favorites folder changes
+    const favoritesFoldersManager = this.favoritesManager.getFoldersManager();
+    this.favoritesFoldersUnsubscribe = favoritesFoldersManager.onChange(
+      this.handleFavoritesFoldersChange,
+    );
+
+    // Load projects
+    await this.loadProjects();
+
+    // Subscribe to projects changes
+    this.projectsUnsubscribe = this.projectsManager.onChange(
+      this.handleProjectsChange,
+    );
+
+    // Subscribe to projects folder changes
+    const projectsFoldersManager = this.projectsManager.getFoldersManager();
+    this.projectsFoldersUnsubscribe = projectsFoldersManager.onChange(
+      this.handleProjectsFoldersChange,
+    );
 
     // Also listen for custom events
     this.windowRef.addEventListener(
@@ -393,7 +543,15 @@ export class SemantixSidebarWidget {
     );
     this.windowRef.addEventListener(
       "semantix-folders-change-favorites",
-      this.handleFoldersChange,
+      this.handleFavoritesFoldersChange,
+    );
+    this.windowRef.addEventListener(
+      "semantix-projects-change",
+      this.handleProjectsChange,
+    );
+    this.windowRef.addEventListener(
+      "semantix-folders-change-projects",
+      this.handleProjectsFoldersChange,
     );
 
     // Inject styles
@@ -432,10 +590,22 @@ export class SemantixSidebarWidget {
       this.favoritesUnsubscribe = null;
     }
 
-    // Unsubscribe from folder changes
-    if (this.foldersUnsubscribe) {
-      this.foldersUnsubscribe();
-      this.foldersUnsubscribe = null;
+    // Unsubscribe from favorites folder changes
+    if (this.favoritesFoldersUnsubscribe) {
+      this.favoritesFoldersUnsubscribe();
+      this.favoritesFoldersUnsubscribe = null;
+    }
+
+    // Unsubscribe from projects changes
+    if (this.projectsUnsubscribe) {
+      this.projectsUnsubscribe();
+      this.projectsUnsubscribe = null;
+    }
+
+    // Unsubscribe from projects folder changes
+    if (this.projectsFoldersUnsubscribe) {
+      this.projectsFoldersUnsubscribe();
+      this.projectsFoldersUnsubscribe = null;
     }
 
     // Remove event listeners
@@ -445,13 +615,27 @@ export class SemantixSidebarWidget {
     );
     this.windowRef.removeEventListener(
       "semantix-folders-change-favorites",
-      this.handleFoldersChange,
+      this.handleFavoritesFoldersChange,
+    );
+    this.windowRef.removeEventListener(
+      "semantix-projects-change",
+      this.handleProjectsChange,
+    );
+    this.windowRef.removeEventListener(
+      "semantix-folders-change-projects",
+      this.handleProjectsFoldersChange,
     );
 
-    // Destroy folder tree renderer
-    if (this.folderTreeRenderer) {
-      this.folderTreeRenderer.destroy();
-      this.folderTreeRenderer = null;
+    // Destroy favorites tree renderer
+    if (this.favoritesTreeRenderer) {
+      this.favoritesTreeRenderer.destroy();
+      this.favoritesTreeRenderer = null;
+    }
+
+    // Destroy projects tree renderer
+    if (this.projectsTreeRenderer) {
+      this.projectsTreeRenderer.destroy();
+      this.projectsTreeRenderer = null;
     }
 
     // Remove section element
@@ -473,7 +657,7 @@ export class SemantixSidebarWidget {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // FAVORITES & FOLDERS
+  // FAVORITES
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -502,10 +686,12 @@ export class SemantixSidebarWidget {
   }
 
   /**
-   * Handle folders change event
+   * Handle favorites folders change event
    */
-  async handleFoldersChange(actionOrEvent, data) {
-    console.log("[SemantixSidebarWidget] Folders changed, refreshing...");
+  async handleFavoritesFoldersChange(actionOrEvent, data) {
+    console.log(
+      "[SemantixSidebarWidget] Favorites folders changed, refreshing...",
+    );
     await this.updateFavoritesContent();
   }
 
@@ -516,7 +702,7 @@ export class SemantixSidebarWidget {
     if (!this.sectionElement) return;
 
     const contentContainer = this.sectionElement.querySelector(
-      ".semantix-favorites-content",
+      '[data-section="favorites"] .semantix-section-content',
     );
     if (!contentContainer) return;
 
@@ -524,8 +710,8 @@ export class SemantixSidebarWidget {
     const structure = await this.favoritesManager.getOrganizedStructure();
 
     // Render using folder tree renderer
-    if (this.folderTreeRenderer) {
-      await this.folderTreeRenderer.render(structure);
+    if (this.favoritesTreeRenderer) {
+      await this.favoritesTreeRenderer.render(structure);
     }
   }
 
@@ -541,6 +727,82 @@ export class SemantixSidebarWidget {
     if (badge) {
       if (this.favorites.length > 0) {
         badge.textContent = this.favorites.length;
+        badge.style.display = "inline";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PROJECTS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Load projects from storage
+   */
+  async loadProjects() {
+    try {
+      this.projects = await this.projectsManager.getAll();
+      console.log(
+        `[SemantixSidebarWidget] Loaded ${this.projects.length} projects`,
+      );
+    } catch (error) {
+      console.error("[SemantixSidebarWidget] Failed to load projects:", error);
+      this.projects = [];
+    }
+  }
+
+  /**
+   * Handle projects change event
+   */
+  async handleProjectsChange(actionOrEvent, item) {
+    console.log("[SemantixSidebarWidget] Projects changed, refreshing...");
+    await this.loadProjects();
+    await this.updateProjectsContent();
+    this.updateProjectsBadge();
+  }
+
+  /**
+   * Handle projects folders change event
+   */
+  async handleProjectsFoldersChange(actionOrEvent, data) {
+    console.log(
+      "[SemantixSidebarWidget] Projects folders changed, refreshing...",
+    );
+    await this.updateProjectsContent();
+  }
+
+  /**
+   * Update the projects content (folders + items)
+   */
+  async updateProjectsContent() {
+    if (!this.sectionElement) return;
+
+    const contentContainer = this.sectionElement.querySelector(
+      '[data-section="projects"] .semantix-section-content',
+    );
+    if (!contentContainer) return;
+
+    // Get organized structure
+    const structure = await this.projectsManager.getOrganizedStructure();
+
+    // Render using folder tree renderer
+    if (this.projectsTreeRenderer) {
+      await this.projectsTreeRenderer.render(structure);
+    }
+  }
+
+  /**
+   * Update the projects count badge
+   */
+  updateProjectsBadge() {
+    if (!this.sectionElement) return;
+
+    const badge = this.sectionElement.querySelector(".semantix-projects-badge");
+    if (badge) {
+      if (this.projects.length > 0) {
+        badge.textContent = this.projects.length;
         badge.style.display = "inline";
       } else {
         badge.style.display = "none";
@@ -653,9 +915,10 @@ export class SemantixSidebarWidget {
       console.log("[SemantixSidebarWidget] Section already exists");
       this.sectionElement = existing;
       this.isInjected = true;
-      this.initFolderTreeRenderer();
+      this.initTreeRenderers();
       this.bindEvents();
       this.updateFavoritesContent();
+      this.updateProjectsContent();
       return true;
     }
 
@@ -672,14 +935,15 @@ export class SemantixSidebarWidget {
     // Insert as first child of aside
     aside.insertBefore(this.sectionElement, aside.firstChild);
 
-    // Initialize folder tree renderer
-    this.initFolderTreeRenderer();
+    // Initialize tree renderers
+    this.initTreeRenderers();
 
     // Bind events
     this.bindEvents();
 
     // Initial render
     this.updateFavoritesContent();
+    this.updateProjectsContent();
 
     this.isInjected = true;
     this.retryCount = 0;
@@ -689,31 +953,47 @@ export class SemantixSidebarWidget {
   }
 
   /**
-   * Initialize the folder tree renderer
+   * Initialize tree renderers for favorites and projects
    */
-  initFolderTreeRenderer() {
-    const contentContainer = this.sectionElement?.querySelector(
-      ".semantix-favorites-content",
+  initTreeRenderers() {
+    // Favorites tree renderer
+    const favoritesContainer = this.sectionElement?.querySelector(
+      '[data-section="favorites"] .semantix-section-content',
     );
 
-    if (!contentContainer) {
-      console.warn("[SemantixSidebarWidget] Content container not found");
-      return;
+    if (favoritesContainer) {
+      this.favoritesTreeRenderer = new FolderTreeRenderer({
+        foldersManager: this.favoritesManager.getFoldersManager(),
+        favoritesManager: this.favoritesManager,
+        document: this.documentRef,
+        window: this.windowRef,
+        onFavoriteClick: this.handleFavoriteClick,
+        onFavoriteRemove: this.handleFavoriteRemove,
+        getCurrentConversationId: () => this.getCurrentConversationId(),
+        escapeHtml: (str) => this.escapeHtml(str),
+      });
+      this.favoritesTreeRenderer.init(favoritesContainer);
     }
 
-    // Create folder tree renderer
-    this.folderTreeRenderer = new FolderTreeRenderer({
-      foldersManager: this.favoritesManager.getFoldersManager(),
-      favoritesManager: this.favoritesManager,
-      document: this.documentRef,
-      window: this.windowRef,
-      onFavoriteClick: this.handleFavoriteClick,
-      onFavoriteRemove: this.handleFavoriteRemove,
-      getCurrentConversationId: () => this.getCurrentConversationId(),
-      escapeHtml: (str) => this.escapeHtml(str),
-    });
+    // Projects tree renderer
+    const projectsContainer = this.sectionElement?.querySelector(
+      '[data-section="projects"] .semantix-section-content',
+    );
 
-    this.folderTreeRenderer.init(contentContainer);
+    if (projectsContainer) {
+      this.projectsTreeRenderer = new FolderTreeRenderer({
+        foldersManager: this.projectsManager.getFoldersManager(),
+        favoritesManager: this.projectsManager, // Same interface
+        document: this.documentRef,
+        window: this.windowRef,
+        onFavoriteClick: this.handleProjectClick,
+        onFavoriteRemove: this.handleProjectRemove,
+        getCurrentConversationId: () => null, // Projects don't have active state
+        escapeHtml: (str) => this.escapeHtml(str),
+        itemType: "project",
+      });
+      this.projectsTreeRenderer.init(projectsContainer);
+    }
   }
 
   /**
@@ -739,19 +1019,36 @@ export class SemantixSidebarWidget {
       </div>
       <div class="${CLASSES.MENU}">
         <!-- Favorites Section -->
-        <div class="semantix-favorites-section expanded" data-section="favorites">
-          <div class="semantix-favorites-header" data-action="toggle-section">
-            <span class="semantix-favorites-chevron">${ICONS.chevronRight}</span>
+        <div class="semantix-section-item expanded" data-section="favorites">
+          <div class="semantix-section-header" data-action="toggle-section">
+            <span class="semantix-section-chevron">${ICONS.chevronRight}</span>
             ${ICONS.star}
             <span>Favorites</span>
             <span class="semantix-sidebar-badge semantix-favorites-badge" style="${favoritesCount > 0 ? "" : "display:none"}">${favoritesCount}</span>
-            <button class="semantix-add-folder-btn" data-action="create-folder" title="Create new folder">
+            <button class="semantix-add-btn" data-action="create-folder" data-section="favorites" title="Create new folder">
               ${ICONS.folderPlus}
             </button>
           </div>
-          <div class="semantix-favorites-content">
+          <div class="semantix-section-content">
             <!-- Folder tree will be rendered here by FolderTreeRenderer -->
-            <div class="semantix-favorites-loading">Loading...</div>
+            <div class="semantix-loading">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Projects Section -->
+        <div class="semantix-section-item expanded" data-section="projects">
+          <div class="semantix-section-header" data-action="toggle-section">
+            <span class="semantix-section-chevron">${ICONS.chevronRight}</span>
+            ${ICONS.folder}
+            <span>Projects</span>
+            <span class="semantix-sidebar-badge semantix-projects-badge" style="${this.projects.length > 0 ? "" : "display:none"}">${this.projects.length}</span>
+            <button class="semantix-add-btn" data-action="add-project" data-section="projects" title="Add new project">
+              ${ICONS.plus}
+            </button>
+          </div>
+          <div class="semantix-section-content">
+            <!-- Projects tree will be rendered here -->
+            <div class="semantix-loading">Loading...</div>
           </div>
         </div>
       </div>
@@ -786,44 +1083,52 @@ export class SemantixSidebarWidget {
       item.addEventListener("click", this.handleMenuItemClick);
     });
 
-    // Add folder button in favorites header
-    const addFolderBtn = this.sectionElement.querySelector(
-      ".semantix-add-folder-btn",
-    );
-    if (addFolderBtn) {
-      addFolderBtn.addEventListener("click", async (e) => {
+    // Add buttons in section headers
+    const addBtns = this.sectionElement.querySelectorAll(".semantix-add-btn");
+    addBtns.forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (this.folderTreeRenderer) {
-          await this.handleCreateFolder();
+        const action = btn.dataset.action;
+        const section = btn.dataset.section;
+
+        if (action === "create-folder" && section === "favorites") {
+          await this.handleCreateFavoritesFolder();
+        } else if (action === "add-project") {
+          await this.handleAddProject();
         }
       });
-    }
+    });
 
-    // Favorites section header click (toggle collapse)
-    const favoritesHeader = this.sectionElement.querySelector(
-      ".semantix-favorites-header",
+    // Section headers click (toggle collapse)
+    const sectionHeaders = this.sectionElement.querySelectorAll(
+      ".semantix-section-header",
     );
-    if (favoritesHeader) {
-      favoritesHeader.addEventListener("click", (e) => {
-        // Don't toggle if clicking on add folder button
-        if (e.target.closest(".semantix-add-folder-btn")) {
+    sectionHeaders.forEach((header) => {
+      header.addEventListener("click", (e) => {
+        // Don't toggle if clicking on add button
+        if (e.target.closest(".semantix-add-btn")) {
           return;
         }
-        this.toggleFavoritesSection();
+        const sectionItem = header.closest(".semantix-section-item");
+        const sectionName = sectionItem?.dataset.section;
+        if (sectionName) {
+          this.toggleSection(sectionName);
+        }
       });
-    }
+    });
 
-    // Load favorites section collapsed state
-    this.loadFavoritesSectionState();
+    // Load section collapsed states
+    this.loadSectionStates();
   }
 
   /**
-   * Toggle favorites section collapsed state
+   * Toggle a section's collapsed state
+   * @param {string} sectionName - 'favorites' or 'projects'
    */
-  toggleFavoritesSection() {
+  toggleSection(sectionName) {
     const section = this.sectionElement?.querySelector(
-      ".semantix-favorites-section",
+      `[data-section="${sectionName}"]`,
     );
     if (!section) return;
 
@@ -836,59 +1141,64 @@ export class SemantixSidebarWidget {
     }
 
     // Save state
-    this.saveFavoritesSectionState(!isExpanded);
+    this.saveSectionState(sectionName, !isExpanded);
   }
 
   /**
-   * Load favorites section collapsed state from storage
+   * Load section collapsed states from storage
    */
-  loadFavoritesSectionState() {
-    try {
-      const stored = localStorage.getItem(
-        "semantix_favorites_section_expanded",
-      );
-      const isExpanded = stored === null ? true : stored === "true";
+  loadSectionStates() {
+    const sections = ["favorites", "projects"];
 
-      const section = this.sectionElement?.querySelector(
-        ".semantix-favorites-section",
-      );
-      if (section) {
-        if (isExpanded) {
-          section.classList.add("expanded");
-        } else {
-          section.classList.remove("expanded");
+    for (const sectionName of sections) {
+      try {
+        const stored = localStorage.getItem(
+          `semantix_${sectionName}_section_expanded`,
+        );
+        const isExpanded = stored === null ? true : stored === "true";
+
+        const section = this.sectionElement?.querySelector(
+          `[data-section="${sectionName}"]`,
+        );
+        if (section) {
+          if (isExpanded) {
+            section.classList.add("expanded");
+          } else {
+            section.classList.remove("expanded");
+          }
         }
+      } catch (error) {
+        console.warn(
+          `[SemantixSidebarWidget] Failed to load ${sectionName} section state:`,
+          error,
+        );
       }
-    } catch (error) {
-      console.warn(
-        "[SemantixSidebarWidget] Failed to load favorites section state:",
-        error,
-      );
     }
   }
 
   /**
-   * Save favorites section collapsed state to storage
+   * Save section collapsed state to storage
+   * @param {string} sectionName
    * @param {boolean} isExpanded
    */
-  saveFavoritesSectionState(isExpanded) {
+  saveSectionState(sectionName, isExpanded) {
     try {
       localStorage.setItem(
-        "semantix_favorites_section_expanded",
+        `semantix_${sectionName}_section_expanded`,
         isExpanded ? "true" : "false",
       );
     } catch (error) {
       console.warn(
-        "[SemantixSidebarWidget] Failed to save favorites section state:",
+        `[SemantixSidebarWidget] Failed to save ${sectionName} section state:`,
         error,
       );
     }
   }
 
   /**
-   * Handle create folder from header button
+   * Handle create folder in favorites section
    */
-  async handleCreateFolder() {
+  async handleCreateFavoritesFolder() {
     const foldersManager = this.favoritesManager.getFoldersManager();
 
     // Check if can create more root folders
@@ -907,7 +1217,60 @@ export class SemantixSidebarWidget {
     if (folder) {
       // Refresh and start rename
       await this.updateFavoritesContent();
-      this.folderTreeRenderer.startRename(folder.id);
+      this.favoritesTreeRenderer.startRename(folder.id);
+    }
+  }
+
+  /**
+   * Handle add new project
+   */
+  async handleAddProject() {
+    // Create project with default name
+    const project = await this.projectsManager.add({
+      name: "New Project",
+    });
+
+    if (project) {
+      // Refresh - project will appear in list
+      await this.updateProjectsContent();
+      this.updateProjectsBadge();
+      // Start inline rename for the new project
+      if (this.projectsTreeRenderer) {
+        this.projectsTreeRenderer.startItemRename(project.id);
+      }
+    }
+  }
+
+  /**
+   * Handle project click
+   * @param {Event} e
+   */
+  handleProjectClick(e) {
+    const target = e.currentTarget;
+    const projectId = target.dataset.projectId;
+    console.log(`[SemantixSidebarWidget] Project clicked:`, projectId);
+  }
+
+  /**
+   * Handle project remove
+   * @param {Event} e
+   */
+  async handleProjectRemove(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const target = e.currentTarget;
+    const projectId = target.dataset.removeId;
+
+    if (!projectId) return;
+
+    console.log(`[SemantixSidebarWidget] Removing project:`, projectId);
+
+    try {
+      await this.projectsManager.remove(projectId);
+      // Change event will trigger refresh
+    } catch (error) {
+      console.error("[SemantixSidebarWidget] Failed to remove project:", error);
     }
   }
 

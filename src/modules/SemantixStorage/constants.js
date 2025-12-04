@@ -12,6 +12,9 @@ export const STORAGE_KEYS = {
   FAVORITES: "semantix_favorites",
   FAVORITES_ORDER: "semantix_favorites_order",
 
+  // Projects
+  PROJECTS: "semantix_projects",
+
   // Folders (generic system for all sections)
   SEMANTIX_FOLDERS: "semantix_folders",
   SELECTED_FOLDER: "semantix_selected_folder",

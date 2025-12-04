@@ -28,6 +28,13 @@ export {
   getPromptsFoldersManager,
 } from "./SectionFoldersManager.js";
 
+// Projects manager
+export {
+  ProjectsManager,
+  getProjectsManager,
+  createProjectsManager,
+} from "./ProjectsManager.js";
+
 // Constants
 export {
   STORAGE_KEYS,

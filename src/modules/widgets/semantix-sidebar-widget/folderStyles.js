@@ -528,17 +528,20 @@ export const FOLDER_STYLES = `
   opacity: 1;
 }
 
-/* Dragging state for items */
-.semantix-favorite-item.dragging {
+/* Dragging state for items (favorites and projects) */
+.semantix-favorite-item.dragging,
+.semantix-project-item.dragging {
   opacity: 0.4;
   background-color: rgba(16, 163, 127, 0.1);
 }
 
-.semantix-favorite-item[draggable="true"] {
+.semantix-favorite-item[draggable="true"],
+.semantix-project-item[draggable="true"] {
   cursor: grab;
 }
 
-.semantix-favorite-item[draggable="true"]:active {
+.semantix-favorite-item[draggable="true"]:active,
+.semantix-project-item[draggable="true"]:active {
   cursor: grabbing;
 }
 
@@ -575,7 +578,8 @@ export const FOLDER_STYLES = `
 }
 
 /* Drag handle indicator on hover */
-.semantix-favorite-item:hover .semantix-favorite-star {
+.semantix-favorite-item:hover .semantix-favorite-star,
+.semantix-project-item:hover .semantix-project-icon {
   cursor: grab;
 }
 

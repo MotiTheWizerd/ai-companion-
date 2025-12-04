@@ -22,13 +22,14 @@ export class FolderTreeRenderer {
   /**
    * @param {Object} options
    * @param {Object} options.foldersManager - SectionFoldersManager instance
-   * @param {Object} options.favoritesManager - FavoritesManager instance
+   * @param {Object} options.favoritesManager - FavoritesManager/ProjectsManager instance
    * @param {Document} options.document - Document reference
    * @param {Window} options.window - Window reference
-   * @param {Function} options.onFavoriteClick - Callback when favorite is clicked
-   * @param {Function} options.onFavoriteRemove - Callback when favorite is removed
+   * @param {Function} options.onFavoriteClick - Callback when item is clicked
+   * @param {Function} options.onFavoriteRemove - Callback when item is removed
    * @param {Function} options.getCurrentConversationId - Function to get current conversation ID
    * @param {Function} options.escapeHtml - Function to escape HTML
+   * @param {string} options.itemType - Type of items ('favorite' or 'project')
    */
   constructor(options = {}) {
     this.foldersManager = options.foldersManager;
@@ -39,6 +40,7 @@ export class FolderTreeRenderer {
     this.onFavoriteRemove = options.onFavoriteRemove;
     this.getCurrentConversationId = options.getCurrentConversationId;
     this.escapeHtml = options.escapeHtml || ((s) => s);
+    this.itemType = options.itemType || "favorite"; // 'favorite' or 'project'
 
     // State
     this.container = null;
@@ -243,12 +245,16 @@ export class FolderTreeRenderer {
   }
 
   /**
-   * Render a favorite item
-   * @param {Object} item - Favorite item
+   * Render an item (favorite or project)
+   * @param {Object} item - Item object
    * @param {string} currentConversationId - Current active conversation ID
    * @returns {string} HTML string
    */
   renderFavoriteItem(item, currentConversationId) {
+    if (this.itemType === "project") {
+      return this.renderProjectItem(item);
+    }
+
     const isActive = item.conversationId === currentConversationId;
     const activeClass = isActive ? "active" : "";
 
@@ -269,10 +275,51 @@ export class FolderTreeRenderer {
   }
 
   /**
+   * Render a project item
+   * @param {Object} item - Project item
+   * @returns {string} HTML string
+   */
+  renderProjectItem(item) {
+    const iconKey = item.icon || "folder";
+    const projectIcon = ICONS[iconKey] || ICONS.folder;
+
+    return `
+      <div class="semantix-project-item"
+           data-project-id="${item.id}"
+           data-folder-id="${item.folderId || ""}"
+           title="${this.escapeHtml(item.name)}"
+           draggable="true">
+        <span class="semantix-project-icon" style="color: ${item.color || "#6b7280"}">${projectIcon}</span>
+        <span class="semantix-project-name" data-project-id="${item.id}">${this.escapeHtml(item.name)}</span>
+        <div class="semantix-project-actions">
+          <button class="semantix-project-action-btn" data-action="project-menu" data-project-id="${item.id}" title="More options">
+            ${ICONS.moreHorizontal}
+          </button>
+        </div>
+        <span class="semantix-project-remove" data-remove-id="${item.id}" title="Remove project">
+          ${ICONS.x}
+        </span>
+      </div>
+    `;
+  }
+
+  /**
    * Render empty state
    * @returns {string} HTML string
    */
   renderEmptyState() {
+    if (this.itemType === "project") {
+      return `
+        <div class="semantix-folder-empty">
+          <div class="semantix-folder-empty-icon">
+            ${ICONS.folder}
+          </div>
+          <span>No projects yet</span>
+          <span style="font-size: 12px;">Click + to add a project</span>
+        </div>
+      `;
+    }
+
     return `
       <div class="semantix-folder-empty">
         <div class="semantix-folder-empty-icon">
@@ -328,22 +375,60 @@ export class FolderTreeRenderer {
       rootSelector.addEventListener("click", () => this.selectFolder(null));
     }
 
-    // Favorite items (click to navigate)
-    const favoriteItems = this.container.querySelectorAll(
-      ".semantix-favorite-item",
-    );
-    favoriteItems.forEach((item) => {
+    // Items (favorites or projects) - click to navigate/select
+    const itemSelector =
+      this.itemType === "project"
+        ? ".semantix-project-item"
+        : ".semantix-favorite-item";
+    const items = this.container.querySelectorAll(itemSelector);
+    items.forEach((item) => {
       item.addEventListener("click", (e) => {
+        // Don't trigger click if clicking on actions or remove
+        if (
+          e.target.closest(".semantix-project-actions") ||
+          e.target.closest(".semantix-project-remove")
+        ) {
+          return;
+        }
         if (this.onFavoriteClick) {
           this.onFavoriteClick(e);
         }
       });
+      // Add context menu for projects
+      if (this.itemType === "project") {
+        item.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          const projectId = item.dataset.projectId;
+          if (projectId) {
+            this.showProjectContextMenu(projectId, e);
+          }
+        });
+      }
     });
 
-    // Favorite remove buttons
-    const removeButtons = this.container.querySelectorAll(
-      ".semantix-favorite-remove",
-    );
+    // Project action buttons
+    if (this.itemType === "project") {
+      const projectActionBtns = this.container.querySelectorAll(
+        ".semantix-project-action-btn",
+      );
+      projectActionBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const projectId = btn.dataset.projectId;
+          const action = btn.dataset.action;
+          if (action === "project-menu" && projectId) {
+            this.showProjectContextMenu(projectId, e);
+          }
+        });
+      });
+    }
+
+    // Remove buttons (favorites or projects)
+    const removeSelector =
+      this.itemType === "project"
+        ? ".semantix-project-remove"
+        : ".semantix-favorite-remove";
+    const removeButtons = this.container.querySelectorAll(removeSelector);
     removeButtons.forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -354,10 +439,12 @@ export class FolderTreeRenderer {
       });
     });
 
-    // Drag & drop for favorite items
-    const draggableItems = this.container.querySelectorAll(
-      ".semantix-favorite-item[draggable='true']",
-    );
+    // Drag & drop for items (favorites or projects)
+    const draggableSelector =
+      this.itemType === "project"
+        ? ".semantix-project-item[draggable='true']"
+        : ".semantix-favorite-item[draggable='true']";
+    const draggableItems = this.container.querySelectorAll(draggableSelector);
     draggableItems.forEach((item) => {
       item.addEventListener("dragstart", this.handleDragStart);
       item.addEventListener("dragend", this.handleDragEnd);
@@ -454,6 +541,379 @@ export class FolderTreeRenderer {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // PROJECT CONTEXT MENU & RENAME
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Show context menu for a project
+   * @param {string} projectId
+   * @param {Event} e
+   */
+  async showProjectContextMenu(projectId, e) {
+    this.closeAllMenus();
+
+    const project = await this.favoritesManager.get(projectId);
+    if (!project) return;
+
+    const menuItems = [
+      { action: "rename-project", icon: "edit", label: "Rename" },
+      {
+        action: "change-project-color",
+        icon: "palette",
+        label: "Change Color",
+      },
+      { action: "change-project-icon", icon: "folder", label: "Change Icon" },
+      { separator: true },
+      {
+        action: "delete-project",
+        icon: "trash",
+        label: "Delete",
+        danger: true,
+      },
+    ];
+
+    // Create menu HTML
+    let menuHtml = `<div class="${CLASSES.CONTEXT_MENU}" data-project-id="${projectId}">`;
+
+    for (const item of menuItems) {
+      if (item.separator) {
+        menuHtml += `<div class="${CLASSES.CONTEXT_MENU_SEPARATOR}"></div>`;
+      } else {
+        const dangerClass = item.danger ? CLASSES.CONTEXT_MENU_DANGER : "";
+        menuHtml += `
+          <div class="${CLASSES.CONTEXT_MENU_ITEM} ${dangerClass}" data-action="${item.action}">
+            <span class="${CLASSES.CONTEXT_MENU_ICON}">${ICONS[item.icon] || ""}</span>
+            <span class="${CLASSES.CONTEXT_MENU_LABEL}">${item.label}</span>
+          </div>
+        `;
+      }
+    }
+
+    menuHtml += `</div>`;
+
+    // Create element and position
+    const menu = this.documentRef.createElement("div");
+    menu.innerHTML = menuHtml;
+    this.contextMenu = menu.firstElementChild;
+
+    this.documentRef.body.appendChild(this.contextMenu);
+
+    // Position menu
+    const rect = this.contextMenu.getBoundingClientRect();
+    let x = e.clientX;
+    let y = e.clientY;
+
+    // Keep within viewport
+    if (x + rect.width > this.windowRef.innerWidth) {
+      x = this.windowRef.innerWidth - rect.width - 10;
+    }
+    if (y + rect.height > this.windowRef.innerHeight) {
+      y = this.windowRef.innerHeight - rect.height - 10;
+    }
+
+    this.contextMenu.style.left = `${x}px`;
+    this.contextMenu.style.top = `${y}px`;
+
+    // Bind menu item clicks
+    const menuItemElements = this.contextMenu.querySelectorAll(
+      `.${CLASSES.CONTEXT_MENU_ITEM}`,
+    );
+    menuItemElements.forEach((item) => {
+      item.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.handleProjectContextMenuAction(projectId, item.dataset.action);
+      });
+    });
+  }
+
+  /**
+   * Handle project context menu action
+   * @param {string} projectId
+   * @param {string} action
+   */
+  async handleProjectContextMenuAction(projectId, action) {
+    this.closeContextMenu();
+
+    switch (action) {
+      case "rename-project":
+        this.startProjectRename(projectId);
+        break;
+
+      case "change-project-color":
+        this.showProjectColorPicker(projectId);
+        break;
+
+      case "change-project-icon":
+        this.showProjectIconPicker(projectId);
+        break;
+
+      case "delete-project":
+        await this.confirmDeleteProject(projectId);
+        break;
+    }
+  }
+
+  /**
+   * Start inline rename for a project
+   * @param {string} projectId
+   */
+  async startProjectRename(projectId) {
+    const project = await this.favoritesManager.get(projectId);
+    if (!project) return;
+
+    const projectItem = this.container.querySelector(
+      `.semantix-project-item[data-project-id="${projectId}"]`,
+    );
+    if (!projectItem) return;
+
+    const nameElement = projectItem.querySelector(".semantix-project-name");
+    if (!nameElement) return;
+
+    // Create input
+    const input = this.documentRef.createElement("input");
+    input.type = "text";
+    input.className = CLASSES.FOLDER_INPUT;
+    input.value = project.name;
+    input.style.cssText = "flex: 1; margin: -4px 0;";
+
+    // Replace name with input
+    const originalContent = nameElement.innerHTML;
+    nameElement.innerHTML = "";
+    nameElement.appendChild(input);
+
+    this.activeRenameInput = input;
+
+    // Focus and select
+    input.focus();
+    input.select();
+
+    // Handle save
+    const saveRename = async () => {
+      const newName = input.value.trim();
+      if (newName && newName !== project.name) {
+        await this.favoritesManager.update(projectId, { name: newName });
+        await this.refreshStructure();
+      } else {
+        nameElement.innerHTML = originalContent;
+      }
+      this.activeRenameInput = null;
+    };
+
+    // Handle cancel
+    const cancelRename = () => {
+      nameElement.innerHTML = originalContent;
+      this.activeRenameInput = null;
+    };
+
+    // Events
+    input.addEventListener("blur", saveRename);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        input.removeEventListener("blur", saveRename);
+        cancelRename();
+      }
+    });
+  }
+
+  /**
+   * Show color picker for a project
+   * @param {string} projectId
+   */
+  async showProjectColorPicker(projectId) {
+    this.closeAllMenus();
+
+    const project = await this.favoritesManager.get(projectId);
+    if (!project) return;
+
+    const projectItem = this.container.querySelector(
+      `.semantix-project-item[data-project-id="${projectId}"]`,
+    );
+    if (!projectItem) return;
+
+    // Create color picker HTML
+    let html = `<div class="${CLASSES.COLOR_PICKER}" data-project-id="${projectId}">`;
+
+    for (const color of FOLDER_COLORS) {
+      const selectedClass =
+        project.color === color.value ? CLASSES.COLOR_OPTION_SELECTED : "";
+      html += `
+        <div class="${CLASSES.COLOR_OPTION} ${selectedClass}"
+             data-color="${color.value}"
+             style="background-color: ${color.value}"
+             title="${color.name}">
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+
+    // Create element
+    const picker = this.documentRef.createElement("div");
+    picker.innerHTML = html;
+    this.colorPicker = picker.firstElementChild;
+
+    this.documentRef.body.appendChild(this.colorPicker);
+
+    // Position near project
+    const rect = projectItem.getBoundingClientRect();
+    this.colorPicker.style.position = "fixed";
+    this.colorPicker.style.left = `${rect.right + 10}px`;
+    this.colorPicker.style.top = `${rect.top}px`;
+
+    // Keep in viewport
+    const pickerRect = this.colorPicker.getBoundingClientRect();
+    if (pickerRect.right > this.windowRef.innerWidth) {
+      this.colorPicker.style.left = `${rect.left - pickerRect.width - 10}px`;
+    }
+
+    // Bind color clicks
+    const colorOptions = this.colorPicker.querySelectorAll(
+      `.${CLASSES.COLOR_OPTION}`,
+    );
+    colorOptions.forEach((option) => {
+      option.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const color = option.dataset.color;
+        await this.favoritesManager.update(projectId, { color });
+        this.closeColorPicker();
+        await this.refreshStructure();
+      });
+    });
+  }
+
+  /**
+   * Show icon picker for a project
+   * @param {string} projectId
+   */
+  async showProjectIconPicker(projectId) {
+    this.closeAllMenus();
+
+    const project = await this.favoritesManager.get(projectId);
+    if (!project) return;
+
+    const projectItem = this.container.querySelector(
+      `.semantix-project-item[data-project-id="${projectId}"]`,
+    );
+    if (!projectItem) return;
+
+    // Create icon picker HTML
+    let html = `<div class="semantix-icon-picker" data-project-id="${projectId}">`;
+
+    for (const [iconId, iconKey] of Object.entries(FOLDER_ICON_MAP)) {
+      const icon = ICONS[iconKey];
+      if (!icon) continue;
+      const selectedClass = project.icon === iconId ? "selected" : "";
+      html += `
+        <div class="semantix-icon-option ${selectedClass}"
+             data-icon="${iconId}"
+             title="${iconId}">
+          ${icon}
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+
+    // Create element
+    const picker = this.documentRef.createElement("div");
+    picker.innerHTML = html;
+    this.iconPicker = picker.firstElementChild;
+
+    this.documentRef.body.appendChild(this.iconPicker);
+
+    // Position near project
+    const rect = projectItem.getBoundingClientRect();
+    this.iconPicker.style.position = "fixed";
+    this.iconPicker.style.left = `${rect.right + 10}px`;
+    this.iconPicker.style.top = `${rect.top}px`;
+
+    // Keep in viewport
+    const pickerRect = this.iconPicker.getBoundingClientRect();
+    if (pickerRect.right > this.windowRef.innerWidth) {
+      this.iconPicker.style.left = `${rect.left - pickerRect.width - 10}px`;
+    }
+
+    // Bind icon clicks
+    const iconOptions = this.iconPicker.querySelectorAll(
+      ".semantix-icon-option",
+    );
+    iconOptions.forEach((option) => {
+      option.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const icon = option.dataset.icon;
+        await this.favoritesManager.update(projectId, { icon });
+        this.closeIconPicker();
+        await this.refreshStructure();
+      });
+    });
+  }
+
+  /**
+   * Show delete confirmation for a project
+   * @param {string} projectId
+   */
+  async confirmDeleteProject(projectId) {
+    const project = await this.favoritesManager.get(projectId);
+    if (!project) return;
+
+    const message = `Are you sure you want to delete "${project.name}"?`;
+
+    // Create dialog
+    const dialog = this.documentRef.createElement("div");
+    dialog.className = "semantix-confirm-dialog";
+    dialog.innerHTML = `
+      <div class="semantix-confirm-dialog-content">
+        <div class="semantix-confirm-dialog-title">Delete Project</div>
+        <div class="semantix-confirm-dialog-message">${message}</div>
+        <div class="semantix-confirm-dialog-actions">
+          <button class="semantix-confirm-dialog-btn cancel">Cancel</button>
+          <button class="semantix-confirm-dialog-btn confirm">Delete</button>
+        </div>
+      </div>
+    `;
+
+    this.documentRef.body.appendChild(dialog);
+
+    // Handle actions
+    const cancelBtn = dialog.querySelector(".cancel");
+    const confirmBtn = dialog.querySelector(".confirm");
+
+    const closeDialog = () => {
+      dialog.remove();
+    };
+
+    cancelBtn.addEventListener("click", closeDialog);
+
+    confirmBtn.addEventListener("click", async () => {
+      closeDialog();
+      await this.favoritesManager.remove(projectId);
+      await this.refreshStructure();
+      this.showToast(`Project "${project.name}" deleted`, "success");
+    });
+
+    // Close on backdrop click
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) {
+        closeDialog();
+      }
+    });
+  }
+
+  /**
+   * Start rename for a newly created project (public method)
+   * @param {string} projectId
+   */
+  startItemRename(projectId) {
+    if (this.itemType === "project") {
+      this.startProjectRename(projectId);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // FOLDER SELECTION
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -498,21 +958,24 @@ export class FolderTreeRenderer {
    */
   handleDragStart(e) {
     const target = e.currentTarget;
-    const conversationId = target.dataset.conversationId;
+    const itemId =
+      this.itemType === "project"
+        ? target.dataset.projectId
+        : target.dataset.conversationId;
 
-    if (!conversationId) return;
+    if (!itemId) return;
 
-    this.draggedItem = conversationId;
-    this.draggedItemType = "favorite";
+    this.draggedItem = itemId;
+    this.draggedItemType = this.itemType;
 
     // Set drag data
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", conversationId);
+    e.dataTransfer.setData("text/plain", itemId);
 
     // Add dragging class
     target.classList.add("dragging");
 
-    console.log("[FolderTreeRenderer] Drag started:", conversationId);
+    console.log("[FolderTreeRenderer] Drag started:", itemId);
   }
 
   /**
@@ -563,7 +1026,7 @@ export class FolderTreeRenderer {
     const target = e.currentTarget;
     target.classList.remove("drag-over");
 
-    if (!this.draggedItem || this.draggedItemType !== "favorite") {
+    if (!this.draggedItem || this.draggedItemType !== this.itemType) {
       return;
     }
 
