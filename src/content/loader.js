@@ -408,3 +408,172 @@ window.addEventListener("message", async (event) => {
 });
 
 console.log("[Loader] Message bridge initialized");
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEMANTIX STORAGE BRIDGE
+// Handles storage requests from page context for SemantixStorage module
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SEMANTIX_STORAGE_SOURCE = "semantix-storage";
+const SEMANTIX_STORAGE_RESPONSE = "semantix-storage-response";
+
+const SEMANTIX_STORAGE_TYPES = {
+  GET: "SEMANTIX_STORAGE_GET",
+  SET: "SEMANTIX_STORAGE_SET",
+  REMOVE: "SEMANTIX_STORAGE_REMOVE",
+  GET_MULTIPLE: "SEMANTIX_STORAGE_GET_MULTIPLE",
+  SET_MULTIPLE: "SEMANTIX_STORAGE_SET_MULTIPLE",
+  RESPONSE: "SEMANTIX_STORAGE_RESPONSE",
+  UPDATE: "SEMANTIX_STORAGE_UPDATE",
+};
+
+/**
+ * Send storage response back to page context
+ */
+function sendStorageResponse(requestId, success, data = null, error = null) {
+  window.postMessage(
+    {
+      source: SEMANTIX_STORAGE_RESPONSE,
+      type: SEMANTIX_STORAGE_TYPES.RESPONSE,
+      requestId,
+      success,
+      data,
+      error,
+    },
+    "*",
+  );
+}
+
+/**
+ * Broadcast storage update to page context
+ */
+function broadcastStorageUpdate(key, value) {
+  window.postMessage(
+    {
+      source: SEMANTIX_STORAGE_RESPONSE,
+      type: SEMANTIX_STORAGE_TYPES.UPDATE,
+      key,
+      data: value,
+    },
+    "*",
+  );
+}
+
+/**
+ * Handle SemantixStorage GET request
+ */
+async function handleStorageGet(payload, requestId) {
+  try {
+    const { key } = payload;
+    const result = await chrome.storage.local.get([key]);
+    sendStorageResponse(requestId, true, result[key] ?? null);
+  } catch (error) {
+    console.error("[Loader] Storage GET failed:", error);
+    sendStorageResponse(requestId, false, null, error.message);
+  }
+}
+
+/**
+ * Handle SemantixStorage SET request
+ */
+async function handleStorageSet(payload, requestId) {
+  try {
+    const { key, value } = payload;
+    await chrome.storage.local.set({ [key]: value });
+    console.log("[Loader] Storage SET:", key);
+    sendStorageResponse(requestId, true, value);
+  } catch (error) {
+    console.error("[Loader] Storage SET failed:", error);
+    sendStorageResponse(requestId, false, null, error.message);
+  }
+}
+
+/**
+ * Handle SemantixStorage REMOVE request
+ */
+async function handleStorageRemove(payload, requestId) {
+  try {
+    const { key } = payload;
+    await chrome.storage.local.remove(key);
+    console.log("[Loader] Storage REMOVE:", key);
+    sendStorageResponse(requestId, true, null);
+  } catch (error) {
+    console.error("[Loader] Storage REMOVE failed:", error);
+    sendStorageResponse(requestId, false, null, error.message);
+  }
+}
+
+/**
+ * Handle SemantixStorage GET_MULTIPLE request
+ */
+async function handleStorageGetMultiple(payload, requestId) {
+  try {
+    const { keys } = payload;
+    const result = await chrome.storage.local.get(keys);
+    sendStorageResponse(requestId, true, result);
+  } catch (error) {
+    console.error("[Loader] Storage GET_MULTIPLE failed:", error);
+    sendStorageResponse(requestId, false, null, error.message);
+  }
+}
+
+/**
+ * Handle SemantixStorage SET_MULTIPLE request
+ */
+async function handleStorageSetMultiple(payload, requestId) {
+  try {
+    const { items } = payload;
+    await chrome.storage.local.set(items);
+    console.log("[Loader] Storage SET_MULTIPLE:", Object.keys(items));
+    sendStorageResponse(requestId, true, items);
+  } catch (error) {
+    console.error("[Loader] Storage SET_MULTIPLE failed:", error);
+    sendStorageResponse(requestId, false, null, error.message);
+  }
+}
+
+// Listen for SemantixStorage messages from page context
+window.addEventListener("message", async (event) => {
+  if (event.source !== window) return;
+  if (!event.data || event.data.source !== SEMANTIX_STORAGE_SOURCE) return;
+
+  const { type, requestId, payload } = event.data;
+  console.log("[Loader] SemantixStorage request:", type);
+
+  switch (type) {
+    case SEMANTIX_STORAGE_TYPES.GET:
+      await handleStorageGet(payload, requestId);
+      break;
+    case SEMANTIX_STORAGE_TYPES.SET:
+      await handleStorageSet(payload, requestId);
+      break;
+    case SEMANTIX_STORAGE_TYPES.REMOVE:
+      await handleStorageRemove(payload, requestId);
+      break;
+    case SEMANTIX_STORAGE_TYPES.GET_MULTIPLE:
+      await handleStorageGetMultiple(payload, requestId);
+      break;
+    case SEMANTIX_STORAGE_TYPES.SET_MULTIPLE:
+      await handleStorageSetMultiple(payload, requestId);
+      break;
+    default:
+      console.warn("[Loader] Unknown SemantixStorage type:", type);
+  }
+});
+
+// Listen for chrome.storage changes and broadcast to page context
+if (chrome?.storage?.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+
+    // Broadcast Semantix-related key changes
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if (key.startsWith("semantix_")) {
+        console.log("[Loader] Broadcasting storage update:", key);
+        broadcastStorageUpdate(key, newValue);
+      }
+    }
+  });
+}
+
+console.log("[Loader] SemantixStorage bridge initialized");

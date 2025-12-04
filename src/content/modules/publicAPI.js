@@ -2,8 +2,8 @@
  * Public API exposure module
  * Exposes window.chatGPTMessages API for external access
  */
-import { Logger } from './utils/logger.js';
-import { APIHelper } from '../../modules/APIClient/helpers/index.js';
+import { Logger } from "./utils/logger.js";
+import { APIHelper } from "../../modules/APIClient/helpers/index.js";
 
 /**
  * Expose public API to window object
@@ -19,7 +19,7 @@ export function exposeAPI(conversationManager, storageManager) {
      * @returns {Object} Conversation object with messages
      */
     getConversation: () => {
-      Logger.api('getConversation() called');
+      Logger.api("getConversation() called");
       return conversationManager.getConversation();
     },
 
@@ -28,18 +28,19 @@ export function exposeAPI(conversationManager, storageManager) {
      * @returns {Object} Exported conversation data
      */
     export: () => {
-      Logger.api('export() called');
+      Logger.api("export() called");
       return conversationManager.export();
     },
 
     /**
      * Save current conversation to storage
+     * @deprecated Local storage disabled - conversations sync to server automatically
      * @returns {void}
      */
     save: () => {
-      Logger.api('save() called');
-      const conversation = conversationManager.getConversation();
-      storageManager.saveConversation(conversation);
+      Logger.api(
+        "save() called - DEPRECATED: localStorage disabled, data syncs to server",
+      );
     },
 
     /**
@@ -47,7 +48,7 @@ export function exposeAPI(conversationManager, storageManager) {
      * @returns {void}
      */
     exportToFile: () => {
-      Logger.api('exportToFile() called');
+      Logger.api("exportToFile() called");
       const conversation = conversationManager.getConversation();
       storageManager.exportToFile(conversation);
     },
@@ -61,7 +62,7 @@ export function exposeAPI(conversationManager, storageManager) {
        * @returns {string} Request ID
        */
       syncConversation: () => {
-        Logger.api('api.syncConversation() called');
+        Logger.api("api.syncConversation() called");
         const conversation = conversationManager.getConversation();
         return APIHelper.syncFull(conversation);
       },
@@ -73,7 +74,8 @@ export function exposeAPI(conversationManager, storageManager) {
        */
       syncById: (conversationId) => {
         Logger.api(`api.syncById(${conversationId}) called`);
-        const conversation = conversationManager.getConversation(conversationId);
+        const conversation =
+          conversationManager.getConversation(conversationId);
         return APIHelper.syncFull(conversation);
       },
 
@@ -93,7 +95,7 @@ export function exposeAPI(conversationManager, storageManager) {
        * @returns {string} Request ID
        */
       healthCheck: () => {
-        Logger.api('api.healthCheck() called');
+        Logger.api("api.healthCheck() called");
         return APIHelper.healthCheck();
       },
 
@@ -102,13 +104,13 @@ export function exposeAPI(conversationManager, storageManager) {
        * @returns {Object} API client stats
        */
       getStats: () => {
-        Logger.api('api.getStats() called');
+        Logger.api("api.getStats() called");
         // Note: This would need to be passed from Application.js
         // For now, return placeholder
-        return { message: 'Stats available via application instance' };
+        return { message: "Stats available via application instance" };
       },
     },
   };
 
-  Logger.api('Public API exposed on window.chatGPTMessages');
+  Logger.api("Public API exposed on window.chatGPTMessages");
 }

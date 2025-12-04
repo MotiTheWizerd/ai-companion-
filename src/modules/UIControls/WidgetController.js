@@ -4,6 +4,10 @@ import { EmojiWidget } from "../widgets/emoji-widget/EmojiWidget.js";
 import { QuickJumpWidget } from "../widgets/quick-jump-widget/QuickJumpWidget.js";
 import { RTLDetectWidget } from "../widgets/rtl-detect-widget/RTLDetectWidget.js";
 import { ReflectionSlotWidget } from "../widgets/reflection-slot-widget/ReflectionSlotWidget.js";
+import { SemantixSidebarWidget } from "../widgets/semantix-sidebar-widget/SemantixSidebarWidget.js";
+import { FavoriteButton } from "../widgets/semantix-sidebar-widget/FavoriteButton.js";
+import { ChatHistorySelector } from "../ChatHistorySelector/index.js";
+import { getFavoritesManager } from "../SemantixStorage/index.js";
 import { RetryManager } from "./utils/RetryManager.js";
 
 /**
@@ -20,6 +24,9 @@ export class WidgetController {
     this.quickJumpWidget = null;
     this.rtlDetectWidget = null;
     this.reflectionSlotWidget = null;
+    this.semantixSidebarWidget = null;
+    this.favoriteButton = null;
+    this.chatHistorySelector = null;
   }
 
   init() {
@@ -49,6 +56,9 @@ export class WidgetController {
     this.logDebug("lifecycle:dom-ready", { detail });
     this.tryInjectWithRetry("dom-ready");
     this.initQuickJump();
+    this.initSemantixSidebar();
+    this.initFavoriteButton();
+    this.initChatHistorySelector();
   }
 
   handleHostMutation(detail) {
@@ -59,6 +69,12 @@ export class WidgetController {
     this.initRTLDetect();
     // Try to init ReflectionSlot
     this.initReflectionSlot();
+    // Try to init Semantix Sidebar
+    this.initSemantixSidebar();
+    // Try to init Favorite Button
+    this.initFavoriteButton();
+    // Try to init Chat History Selector
+    this.initChatHistorySelector();
 
     if (this.widgetElement && document.body.contains(this.widgetElement)) {
       return;
@@ -76,6 +92,11 @@ export class WidgetController {
     // Re-initialize ReflectionSlot for new conversation
     this.destroyReflectionSlot();
     this.initReflectionSlot();
+    // Re-initialize Semantix Sidebar (in case sidebar was rebuilt)
+    this.initSemantixSidebar();
+    // Re-initialize Favorite Button for new conversation
+    this.destroyFavoriteButton();
+    this.initFavoriteButton();
   }
 
   tryInjectWithRetry(reason = "manual") {
@@ -412,6 +433,275 @@ export class WidgetController {
     return this.reflectionSlotWidget;
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SEMANTIX SIDEBAR WIDGET
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initialize Semantix Sidebar widget (GPT only)
+   */
+  initSemantixSidebar() {
+    console.log("[WidgetController] initSemantixSidebar() called");
+
+    // Only init if not already present
+    if (this.semantixSidebarWidget) {
+      console.log(
+        "[WidgetController] SemantixSidebar already exists, skipping",
+      );
+      return;
+    }
+
+    // Check if we're on a GPT page (provider check)
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    if (!isGPT) {
+      console.log("[WidgetController] Not GPT page, skipping SemantixSidebar");
+      this.logDebug("semantixsidebar:skipped", {
+        detail: { reason: "not-gpt" },
+      });
+      return;
+    }
+
+    console.log("[WidgetController] Creating SemantixSidebarWidget...");
+    this.semantixSidebarWidget = new SemantixSidebarWidget({
+      document: document,
+      window: window,
+    });
+    this.semantixSidebarWidget.init();
+    console.log("[WidgetController] SemantixSidebarWidget initialized");
+    this.logDebug("semantixsidebar:initialized");
+
+    // Listen for sidebar menu actions
+    this.setupSidebarActionListeners();
+  }
+
+  /**
+   * Setup listeners for Semantix Sidebar menu actions
+   */
+  setupSidebarActionListeners() {
+    window.addEventListener("semantix-sidebar-action", (event) => {
+      const { action, itemId } = event.detail;
+      console.log(
+        `[WidgetController] Sidebar action: ${action}, item: ${itemId}`,
+      );
+
+      switch (action) {
+        case "openFavorites":
+          eventBus.emit("semantix:open-favorites", { source: "sidebar" });
+          break;
+        default:
+          console.log(`[WidgetController] Unknown sidebar action: ${action}`);
+      }
+    });
+  }
+
+  /**
+   * Destroy Semantix Sidebar widget
+   */
+  destroySemantixSidebar() {
+    if (this.semantixSidebarWidget) {
+      this.semantixSidebarWidget.destroy();
+      this.semantixSidebarWidget = null;
+      this.logDebug("semantixsidebar:destroyed");
+    }
+  }
+
+  /**
+   * Get Semantix Sidebar widget instance (for external access)
+   */
+  getSemantixSidebarWidget() {
+    return this.semantixSidebarWidget;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FAVORITE BUTTON
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initialize Favorite Button (GPT only)
+   */
+  initFavoriteButton() {
+    console.log("[WidgetController] initFavoriteButton() called");
+
+    // Only init if not already present
+    if (this.favoriteButton) {
+      console.log("[WidgetController] FavoriteButton already exists, skipping");
+      return;
+    }
+
+    // Check if we're on a GPT page
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    if (!isGPT) {
+      console.log("[WidgetController] Not GPT page, skipping FavoriteButton");
+      this.logDebug("favoritebutton:skipped", {
+        detail: { reason: "not-gpt" },
+      });
+      return;
+    }
+
+    console.log("[WidgetController] Creating FavoriteButton...");
+    this.favoriteButton = new FavoriteButton({
+      document: document,
+      window: window,
+      onFavorite: ({ isFavorited, conversationId, item }) => {
+        console.log(
+          `[WidgetController] Favorite callback: ${conversationId}, favorited: ${isFavorited}`,
+        );
+        eventBus.emit("semantix:favorite-toggle", {
+          source: "header-button",
+          isFavorited,
+          conversationId,
+          item,
+        });
+      },
+    });
+    this.favoriteButton.init();
+    console.log("[WidgetController] FavoriteButton initialized");
+    this.logDebug("favoritebutton:initialized");
+
+    // Expose FavoritesManager globally for debugging
+    const favoritesManager = getFavoritesManager({ provider: "chatgpt" });
+    window.semantixFavorites = {
+      getAll: () => favoritesManager.getAll(),
+      isFavorite: (id) => favoritesManager.isFavorite(id),
+      add: (params) => favoritesManager.add(params),
+      remove: (id) => favoritesManager.remove(id),
+      toggle: (params) => favoritesManager.toggle(params),
+      search: (query) => favoritesManager.search(query),
+      count: () => favoritesManager.count(),
+      debug: () => favoritesManager.debug(),
+      clear: () => favoritesManager.clearAll(),
+    };
+    console.log(
+      "[WidgetController] Exposed window.semantixFavorites for debugging",
+    );
+  }
+
+  /**
+   * Destroy Favorite Button
+   */
+  destroyFavoriteButton() {
+    if (this.favoriteButton) {
+      this.favoriteButton.destroy();
+      this.favoriteButton = null;
+      delete window.semantixFavorites;
+      this.logDebug("favoritebutton:destroyed");
+    }
+  }
+
+  /**
+   * Get Favorite Button instance (for external access)
+   */
+  getFavoriteButton() {
+    return this.favoriteButton;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CHAT HISTORY SELECTOR
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initialize Chat History Selector (GPT only)
+   */
+  initChatHistorySelector() {
+    console.log("[WidgetController] initChatHistorySelector() called");
+
+    // Only init if not already present
+    if (this.chatHistorySelector) {
+      console.log(
+        "[WidgetController] ChatHistorySelector already exists, skipping",
+      );
+      return;
+    }
+
+    // Check if we're on a GPT page
+    const isGPT =
+      window.location.hostname.includes("chatgpt.com") ||
+      window.location.hostname.includes("chat.openai.com");
+
+    if (!isGPT) {
+      console.log(
+        "[WidgetController] Not GPT page, skipping ChatHistorySelector",
+      );
+      this.logDebug("chathistoryselector:skipped", {
+        detail: { reason: "not-gpt" },
+      });
+      return;
+    }
+
+    console.log("[WidgetController] Creating ChatHistorySelector...");
+    this.chatHistorySelector = new ChatHistorySelector({
+      document: document,
+      window: window,
+      onActiveChatChanged: ({ previousId, currentId, chat }) => {
+        console.log(
+          `[WidgetController] Active chat changed: ${previousId} -> ${currentId}`,
+        );
+        eventBus.emit("semantix:active-chat-changed", {
+          source: "chat-history-selector",
+          previousId,
+          currentId,
+          chat: chat?.toObject() || null,
+        });
+      },
+      onChatAdded: ({ conversationId, chat }) => {
+        console.log(`[WidgetController] Chat added: ${conversationId}`);
+        eventBus.emit("semantix:chat-added", {
+          source: "chat-history-selector",
+          conversationId,
+          chat: chat?.toObject() || null,
+        });
+      },
+      onChatRemoved: ({ conversationId }) => {
+        console.log(`[WidgetController] Chat removed: ${conversationId}`);
+        eventBus.emit("semantix:chat-removed", {
+          source: "chat-history-selector",
+          conversationId,
+        });
+      },
+    });
+    this.chatHistorySelector.init();
+    console.log("[WidgetController] ChatHistorySelector initialized");
+    this.logDebug("chathistoryselector:initialized");
+
+    // Expose debug method globally for testing
+    window.semantixChatHistory = {
+      debug: () => this.chatHistorySelector.debug(),
+      getActiveChat: () => this.chatHistorySelector.getActiveChat()?.toObject(),
+      getAllChats: () =>
+        this.chatHistorySelector.getAllChats().map((c) => c.toObject()),
+      findChatById: (id) =>
+        this.chatHistorySelector.findChatById(id)?.toObject(),
+    };
+    console.log(
+      "[WidgetController] Exposed window.semantixChatHistory for debugging",
+    );
+  }
+
+  /**
+   * Destroy Chat History Selector
+   */
+  destroyChatHistorySelector() {
+    if (this.chatHistorySelector) {
+      this.chatHistorySelector.destroy();
+      this.chatHistorySelector = null;
+      delete window.semantixChatHistory;
+      this.logDebug("chathistoryselector:destroyed");
+    }
+  }
+
+  /**
+   * Get Chat History Selector instance (for external access)
+   */
+  getChatHistorySelector() {
+    return this.chatHistorySelector;
+  }
+
   destroyWidget() {
     if (this.widgetElement && this.widgetElement.parentNode) {
       this.widgetElement.remove();
@@ -424,6 +714,9 @@ export class WidgetController {
     this.destroyQuickJump();
     this.destroyRTLDetect();
     this.destroyReflectionSlot();
+    this.destroySemantixSidebar();
+    this.destroyFavoriteButton();
+    this.destroyChatHistorySelector();
     this.retryManager.cancel();
   }
 
