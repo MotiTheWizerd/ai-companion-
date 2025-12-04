@@ -2,10 +2,13 @@
  * FavoritesManager
  * Manages favorite conversations using SemantixStorage
  * Provides high-level API for adding, removing, and querying favorites
+ * Supports folder organization via folderId
+ * Tracks selected folder for folder-aware favoriting
  */
 
 import { getSemantixStorage } from "./SemantixStorage.js";
 import { STORAGE_KEYS, STORAGE_CONFIG } from "./constants.js";
+import { getSectionFoldersManager } from "./SectionFoldersManager.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES (for documentation)
@@ -19,6 +22,7 @@ import { STORAGE_KEYS, STORAGE_CONFIG } from "./constants.js";
  * @property {string} provider - Provider name ('chatgpt' | 'claude' | 'qwen')
  * @property {string} [url] - Full URL to conversation
  * @property {string[]} [tags] - Optional tags for organization
+ * @property {string|null} [folderId] - Folder ID for organization (null = root level)
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -34,6 +38,140 @@ export class FavoritesManager {
     this.cache = null;
     this.cacheTime = 0;
     this.cacheTTL = 5000; // 5 seconds cache
+
+    // Folder manager for this section
+    this.foldersManager = getSectionFoldersManager("favorites");
+
+    // Selected folder state (for folder-aware favoriting)
+    this.selectedFolderId = null;
+    this.selectedFolderLoaded = false;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FOLDER MANAGER ACCESS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get the folders manager for favorites
+   * @returns {SectionFoldersManager}
+   */
+  getFoldersManager() {
+    return this.foldersManager;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SELECTED FOLDER STATE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Load selected folder from storage
+   * @returns {Promise<string|null>}
+   */
+  async loadSelectedFolder() {
+    if (this.selectedFolderLoaded) {
+      return this.selectedFolderId;
+    }
+
+    try {
+      const data = await this.storage.get(STORAGE_KEYS.SELECTED_FOLDER, {});
+      this.selectedFolderId = data.favorites || null;
+      this.selectedFolderLoaded = true;
+
+      // Validate that the folder still exists
+      if (this.selectedFolderId) {
+        const folder = await this.foldersManager.get(this.selectedFolderId);
+        if (!folder) {
+          console.log(
+            "[FavoritesManager] Selected folder no longer exists, clearing",
+          );
+          this.selectedFolderId = null;
+          await this.saveSelectedFolder();
+        }
+      }
+
+      return this.selectedFolderId;
+    } catch (error) {
+      console.error(
+        "[FavoritesManager] Failed to load selected folder:",
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Save selected folder to storage
+   * @returns {Promise<boolean>}
+   */
+  async saveSelectedFolder() {
+    try {
+      const data = await this.storage.get(STORAGE_KEYS.SELECTED_FOLDER, {});
+      data.favorites = this.selectedFolderId;
+      await this.storage.set(STORAGE_KEYS.SELECTED_FOLDER, data);
+      return true;
+    } catch (error) {
+      console.error(
+        "[FavoritesManager] Failed to save selected folder:",
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Get the currently selected folder ID
+   * @returns {Promise<string|null>}
+   */
+  async getSelectedFolderId() {
+    await this.loadSelectedFolder();
+    return this.selectedFolderId;
+  }
+
+  /**
+   * Set the selected folder
+   * @param {string|null} folderId - Folder ID to select (null for root)
+   * @returns {Promise<boolean>}
+   */
+  async setSelectedFolder(folderId) {
+    // Validate folder exists if not null
+    if (folderId !== null) {
+      const folder = await this.foldersManager.get(folderId);
+      if (!folder) {
+        console.error(
+          "[FavoritesManager] Cannot select non-existent folder:",
+          folderId,
+        );
+        return false;
+      }
+    }
+
+    this.selectedFolderId = folderId;
+    this.selectedFolderLoaded = true;
+    await this.saveSelectedFolder();
+
+    // Notify listeners
+    this.notifyListeners("folderSelected", { folderId });
+
+    console.log("[FavoritesManager] Selected folder:", folderId);
+    return true;
+  }
+
+  /**
+   * Clear the selected folder (back to root)
+   * @returns {Promise<boolean>}
+   */
+  async clearSelectedFolder() {
+    return this.setSelectedFolder(null);
+  }
+
+  /**
+   * Get the selected folder object
+   * @returns {Promise<Object|null>}
+   */
+  async getSelectedFolder() {
+    const folderId = await this.getSelectedFolderId();
+    if (!folderId) return null;
+    return this.foldersManager.get(folderId);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -47,7 +185,11 @@ export class FavoritesManager {
    */
   async getAll(forceRefresh = false) {
     // Return cached if valid
-    if (!forceRefresh && this.cache && Date.now() - this.cacheTime < this.cacheTTL) {
+    if (
+      !forceRefresh &&
+      this.cache &&
+      Date.now() - this.cacheTime < this.cacheTTL
+    ) {
       return this.cache;
     }
 
@@ -78,9 +220,18 @@ export class FavoritesManager {
    * @param {string} params.title - Conversation title
    * @param {string} [params.url] - Conversation URL
    * @param {string[]} [params.tags] - Optional tags
+   * @param {string|null} [params.folderId] - Folder ID (null for root, undefined to use selected folder)
+   * @param {boolean} [params.useSelectedFolder=true] - Whether to use selected folder if folderId not specified
    * @returns {Promise<FavoriteItem|null>}
    */
-  async add({ conversationId, title, url, tags = [] }) {
+  async add({
+    conversationId,
+    title,
+    url,
+    tags = [],
+    folderId,
+    useSelectedFolder = true,
+  }) {
     if (!conversationId) {
       console.error("[FavoritesManager] conversationId is required");
       return null;
@@ -100,6 +251,25 @@ export class FavoritesManager {
       return null;
     }
 
+    // Use selected folder if folderId not explicitly provided
+    if (folderId === undefined && useSelectedFolder) {
+      folderId = await this.getSelectedFolderId();
+    } else if (folderId === undefined) {
+      folderId = null;
+    }
+
+    // Validate folderId if provided
+    if (folderId !== null) {
+      const folder = await this.foldersManager.get(folderId);
+      if (!folder) {
+        console.warn(
+          "[FavoritesManager] Folder not found, adding to root:",
+          folderId,
+        );
+        folderId = null;
+      }
+    }
+
     // Create favorite item
     const favorite = {
       conversationId,
@@ -108,6 +278,7 @@ export class FavoritesManager {
       provider: this.provider,
       url: url || this.buildUrl(conversationId),
       tags,
+      folderId,
     };
 
     try {
@@ -149,7 +320,7 @@ export class FavoritesManager {
       await this.storage.removeFromList(
         STORAGE_KEYS.FAVORITES,
         "conversationId",
-        conversationId
+        conversationId,
       );
 
       // Invalidate cache
@@ -174,16 +345,30 @@ export class FavoritesManager {
    * @param {string} params.conversationId - Conversation ID
    * @param {string} params.title - Conversation title
    * @param {string} [params.url] - Conversation URL
+   * @param {string|null} [params.folderId] - Folder ID (undefined to use selected folder)
+   * @param {boolean} [params.useSelectedFolder=true] - Whether to use selected folder
    * @returns {Promise<{isFavorite: boolean, item: FavoriteItem|null}>}
    */
-  async toggle({ conversationId, title, url }) {
+  async toggle({
+    conversationId,
+    title,
+    url,
+    folderId,
+    useSelectedFolder = true,
+  }) {
     const isFav = await this.isFavorite(conversationId);
 
     if (isFav) {
       await this.remove(conversationId);
       return { isFavorite: false, item: null };
     } else {
-      const item = await this.add({ conversationId, title, url });
+      const item = await this.add({
+        conversationId,
+        title,
+        url,
+        folderId,
+        useSelectedFolder,
+      });
       return { isFavorite: true, item };
     }
   }
@@ -229,7 +414,7 @@ export class FavoritesManager {
         STORAGE_KEYS.FAVORITES,
         "conversationId",
         conversationId,
-        safeUpdates
+        safeUpdates,
       );
 
       // Invalidate cache
@@ -293,6 +478,123 @@ export class FavoritesManager {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // FOLDER-BASED QUERIES
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get favorites in a specific folder
+   * @param {string|null} folderId - Folder ID (null for root level items)
+   * @returns {Promise<FavoriteItem[]>}
+   */
+  async getByFolder(folderId = null) {
+    const all = await this.getAll();
+    return all.filter((fav) => fav.folderId === folderId);
+  }
+
+  /**
+   * Get favorites at root level (not in any folder)
+   * @returns {Promise<FavoriteItem[]>}
+   */
+  async getRootItems() {
+    return this.getByFolder(null);
+  }
+
+  /**
+   * Move a favorite to a different folder
+   * @param {string} conversationId - Conversation ID
+   * @param {string|null} newFolderId - New folder ID (null for root)
+   * @returns {Promise<FavoriteItem|null>}
+   */
+  async moveToFolder(conversationId, newFolderId) {
+    if (!conversationId) {
+      console.error("[FavoritesManager] conversationId is required");
+      return null;
+    }
+
+    // Validate new folder if not null
+    if (newFolderId !== null) {
+      const folder = await this.foldersManager.get(newFolderId);
+      if (!folder) {
+        console.error(
+          "[FavoritesManager] Target folder not found:",
+          newFolderId,
+        );
+        return null;
+      }
+    }
+
+    return this.update(conversationId, { folderId: newFolderId });
+  }
+
+  /**
+   * Get count of favorites in a folder (not counting subfolders)
+   * @param {string|null} folderId - Folder ID (null for root)
+   * @returns {Promise<number>}
+   */
+  async countInFolder(folderId = null) {
+    const items = await this.getByFolder(folderId);
+    return items.length;
+  }
+
+  /**
+   * Get count of favorites in a folder and all its subfolders
+   * @param {string|null} folderId - Folder ID (null for root level only)
+   * @returns {Promise<number>}
+   */
+  async countInFolderRecursive(folderId) {
+    if (folderId === null) {
+      // For root, just count root items
+      return this.countInFolder(null);
+    }
+
+    const all = await this.getAll();
+    const folders = await this.foldersManager.getFolders();
+
+    // Collect this folder and all descendants
+    const folderIds = new Set([folderId]);
+    const collectDescendants = (parentId) => {
+      for (const folder of Object.values(folders)) {
+        if (folder.parentId === parentId) {
+          folderIds.add(folder.id);
+          collectDescendants(folder.id);
+        }
+      }
+    };
+    collectDescendants(folderId);
+
+    // Count items in these folders
+    return all.filter((fav) => folderIds.has(fav.folderId)).length;
+  }
+
+  /**
+   * Delete all favorites in a specific folder (used when deleting folder)
+   * @param {string} folderId - Folder ID
+   * @returns {Promise<number>} - Number of deleted items
+   */
+  async deleteInFolder(folderId) {
+    if (!folderId) {
+      console.error("[FavoritesManager] folderId is required");
+      return 0;
+    }
+
+    const items = await this.getByFolder(folderId);
+    let deleted = 0;
+
+    for (const item of items) {
+      const success = await this.remove(item.conversationId);
+      if (success) deleted++;
+    }
+
+    console.log(
+      "[FavoritesManager] Deleted",
+      deleted,
+      "items from folder:",
+      folderId,
+    );
+    return deleted;
+  }
+
   /**
    * Get favorites by tag
    * @param {string} tag - Tag to filter by
@@ -331,9 +633,46 @@ export class FavoritesManager {
    */
   async getRecent(limit = 10) {
     const all = await this.getAll();
-    return all
-      .sort((a, b) => b.addedAt - a.addedAt)
-      .slice(0, limit);
+    return all.sort((a, b) => b.addedAt - a.addedAt).slice(0, limit);
+  }
+
+  /**
+   * Get organized structure for UI rendering
+   * Returns folders with their items, plus root items
+   * @returns {Promise<Object>}
+   */
+  async getOrganizedStructure() {
+    const [favorites, folderTree] = await Promise.all([
+      this.getAll(),
+      this.foldersManager.getTree(),
+    ]);
+
+    // Group favorites by folderId
+    const itemsByFolder = new Map();
+    itemsByFolder.set(null, []); // Root items
+
+    for (const fav of favorites) {
+      const key = fav.folderId || null;
+      if (!itemsByFolder.has(key)) {
+        itemsByFolder.set(key, []);
+      }
+      itemsByFolder.get(key).push(fav);
+    }
+
+    // Build structure
+    const buildNode = (node) => ({
+      folder: node.folder,
+      items: itemsByFolder.get(node.folder.id) || [],
+      children: node.children.map(buildNode),
+      depth: node.depth,
+    });
+
+    return {
+      rootItems: itemsByFolder.get(null) || [],
+      folders: folderTree.map(buildNode),
+      totalItems: favorites.length,
+      totalFolders: await this.foldersManager.count(),
+    };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -368,7 +707,7 @@ export class FavoritesManager {
     this.windowRef.dispatchEvent(
       new CustomEvent("semantix-favorites-change", {
         detail: { action, item },
-      })
+      }),
     );
   }
 
@@ -454,12 +793,16 @@ export class FavoritesManager {
   async debug() {
     const favorites = await this.getAll();
     const tags = await this.getAllTags();
+    const structure = await this.getOrganizedStructure();
 
     console.group("[FavoritesManager] Debug Info");
     console.log("Provider:", this.provider);
     console.log("Total favorites:", favorites.length);
+    console.log("Total folders:", structure.totalFolders);
+    console.log("Root items:", structure.rootItems.length);
     console.log("All tags:", tags);
     console.log("Favorites:", favorites);
+    console.log("Organized structure:", structure);
     console.groupEnd();
 
     return {
@@ -467,6 +810,8 @@ export class FavoritesManager {
       count: favorites.length,
       tags,
       favorites,
+      structure,
+      selectedFolderId: this.selectedFolderId,
     };
   }
 }

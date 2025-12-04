@@ -6,13 +6,15 @@ import {
   CLASSES,
 } from "./constants.js";
 import { getFavoritesManager } from "../../SemantixStorage/index.js";
+import { FolderTreeRenderer } from "./FolderTreeRenderer.js";
+import { FOLDER_STYLES } from "./folderStyles.js";
 
 /**
  * Semantix Sidebar Widget
  * Injects a collapsible "Semantix" section into ChatGPT's sidebar
  * Positioned as the first child of the aside element
  *
- * Now includes a live favorites list!
+ * Now includes folder support with hierarchical organization!
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -82,7 +84,7 @@ const WIDGET_STYLES = `
 }
 
 .${CLASSES.SECTION}.${CLASSES.EXPANDED} .${CLASSES.MENU} {
-  max-height: 1000px;
+  max-height: 2000px;
   opacity: 1;
 }
 
@@ -124,7 +126,7 @@ const WIDGET_STYLES = `
   white-space: nowrap;
 }
 
-/* Badge for items (optional) */
+/* Badge for items */
 .semantix-sidebar-badge {
   background: linear-gradient(135deg, #10a37f 0%, #1a7f64 100%);
   color: white;
@@ -136,7 +138,7 @@ const WIDGET_STYLES = `
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FAVORITES LIST STYLES
+   FAVORITES SECTION STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .semantix-favorites-section {
@@ -162,11 +164,44 @@ const WIDGET_STYLES = `
   opacity: 0.7;
 }
 
-.semantix-favorites-list {
+/* Add folder button in header */
+.semantix-add-folder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary, #8e8e8e);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.semantix-add-folder-btn:hover {
+  background-color: var(--sidebar-surface-secondary, rgba(255, 255, 255, 0.1));
+  color: #10a37f;
+  opacity: 1;
+}
+
+.semantix-add-folder-btn svg {
+  width: 14px;
+  height: 14px;
+  opacity: 1;
+}
+
+.semantix-favorites-content {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FAVORITE ITEM STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .semantix-favorite-item {
   display: flex;
@@ -250,16 +285,10 @@ const WIDGET_STYLES = `
   font-size: 13px;
   text-align: center;
 }
+
+/* Include folder styles */
+${FOLDER_STYLES}
 `;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ADDITIONAL ICONS
-// ═══════════════════════════════════════════════════════════════════════════
-
-const EXTRA_ICONS = {
-  starSmall: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-  x: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
-};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WIDGET CLASS
@@ -278,6 +307,8 @@ export class SemantixSidebarWidget {
     this.favorites = [];
     this.favoritesManager = null;
     this.favoritesUnsubscribe = null;
+    this.foldersUnsubscribe = null;
+    this.folderTreeRenderer = null;
 
     // Event handlers bound to this instance
     this.handleHeaderClick = this.handleHeaderClick.bind(this);
@@ -285,6 +316,7 @@ export class SemantixSidebarWidget {
     this.handleFavoriteClick = this.handleFavoriteClick.bind(this);
     this.handleFavoriteRemove = this.handleFavoriteRemove.bind(this);
     this.handleFavoritesChange = this.handleFavoritesChange.bind(this);
+    this.handleFoldersChange = this.handleFoldersChange.bind(this);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -311,10 +343,18 @@ export class SemantixSidebarWidget {
       this.handleFavoritesChange,
     );
 
-    // Also listen for custom event (from FavoriteButton)
+    // Subscribe to folder changes
+    const foldersManager = this.favoritesManager.getFoldersManager();
+    this.foldersUnsubscribe = foldersManager.onChange(this.handleFoldersChange);
+
+    // Also listen for custom events
     this.windowRef.addEventListener(
       "semantix-favorites-change",
       this.handleFavoritesChange,
+    );
+    this.windowRef.addEventListener(
+      "semantix-folders-change-favorites",
+      this.handleFoldersChange,
     );
 
     // Inject styles
@@ -353,11 +393,27 @@ export class SemantixSidebarWidget {
       this.favoritesUnsubscribe = null;
     }
 
-    // Remove event listener
+    // Unsubscribe from folder changes
+    if (this.foldersUnsubscribe) {
+      this.foldersUnsubscribe();
+      this.foldersUnsubscribe = null;
+    }
+
+    // Remove event listeners
     this.windowRef.removeEventListener(
       "semantix-favorites-change",
       this.handleFavoritesChange,
     );
+    this.windowRef.removeEventListener(
+      "semantix-folders-change-favorites",
+      this.handleFoldersChange,
+    );
+
+    // Destroy folder tree renderer
+    if (this.folderTreeRenderer) {
+      this.folderTreeRenderer.destroy();
+      this.folderTreeRenderer = null;
+    }
 
     // Remove section element
     if (this.sectionElement) {
@@ -378,7 +434,7 @@ export class SemantixSidebarWidget {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // FAVORITES
+  // FAVORITES & FOLDERS
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -402,58 +458,40 @@ export class SemantixSidebarWidget {
   async handleFavoritesChange(actionOrEvent, item) {
     console.log("[SemantixSidebarWidget] Favorites changed, refreshing...");
     await this.loadFavorites();
-    this.updateFavoritesList();
-  }
-
-  /**
-   * Update the favorites list in the DOM
-   */
-  updateFavoritesList() {
-    if (!this.sectionElement) return;
-
-    const listContainer = this.sectionElement.querySelector(
-      ".semantix-favorites-list",
-    );
-    if (!listContainer) return;
-
-    // Get current conversation ID to highlight active
-    const currentConversationId = this.getCurrentConversationId();
-
-    if (this.favorites.length === 0) {
-      listContainer.innerHTML = `
-        <div class="semantix-favorites-empty">
-          No favorites yet. Click ⭐ on a chat to add it!
-        </div>
-      `;
-    } else {
-      listContainer.innerHTML = this.favorites
-        .map((fav) => {
-          const isActive = fav.conversationId === currentConversationId;
-          return `
-          <a href="${fav.url || `/c/${fav.conversationId}`}"
-             class="semantix-favorite-item ${isActive ? "active" : ""}"
-             data-conversation-id="${fav.conversationId}"
-             title="${fav.title}">
-            <span class="semantix-favorite-star">${EXTRA_ICONS.starSmall}</span>
-            <span class="semantix-favorite-title">${this.escapeHtml(fav.title)}</span>
-            <span class="semantix-favorite-remove" data-remove-id="${fav.conversationId}" title="Remove from favorites">
-              ${EXTRA_ICONS.x}
-            </span>
-          </a>
-        `;
-        })
-        .join("");
-
-      // Rebind remove button events
-      this.bindFavoriteRemoveEvents();
-    }
-
-    // Update badge count
+    await this.updateFavoritesContent();
     this.updateFavoritesBadge();
   }
 
   /**
-   * Update the favorites count badge
+   * Handle folders change event
+   */
+  async handleFoldersChange(actionOrEvent, data) {
+    console.log("[SemantixSidebarWidget] Folders changed, refreshing...");
+    await this.updateFavoritesContent();
+  }
+
+  /**
+   * Update the favorites content (folders + items)
+   */
+  async updateFavoritesContent() {
+    if (!this.sectionElement) return;
+
+    const contentContainer = this.sectionElement.querySelector(
+      ".semantix-favorites-content",
+    );
+    if (!contentContainer) return;
+
+    // Get organized structure
+    const structure = await this.favoritesManager.getOrganizedStructure();
+
+    // Render using folder tree renderer
+    if (this.folderTreeRenderer) {
+      await this.folderTreeRenderer.render(structure);
+    }
+  }
+
+  /**
+   * Update the favorites count badge (only counts items, not folders)
    */
   updateFavoritesBadge() {
     if (!this.sectionElement) return;
@@ -576,8 +614,9 @@ export class SemantixSidebarWidget {
       console.log("[SemantixSidebarWidget] Section already exists");
       this.sectionElement = existing;
       this.isInjected = true;
+      this.initFolderTreeRenderer();
       this.bindEvents();
-      this.updateFavoritesList();
+      this.updateFavoritesContent();
       return true;
     }
 
@@ -594,14 +633,48 @@ export class SemantixSidebarWidget {
     // Insert as first child of aside
     aside.insertBefore(this.sectionElement, aside.firstChild);
 
+    // Initialize folder tree renderer
+    this.initFolderTreeRenderer();
+
     // Bind events
     this.bindEvents();
+
+    // Initial render
+    this.updateFavoritesContent();
 
     this.isInjected = true;
     this.retryCount = 0;
     console.log("[SemantixSidebarWidget] Section injected successfully");
 
     return true;
+  }
+
+  /**
+   * Initialize the folder tree renderer
+   */
+  initFolderTreeRenderer() {
+    const contentContainer = this.sectionElement?.querySelector(
+      ".semantix-favorites-content",
+    );
+
+    if (!contentContainer) {
+      console.warn("[SemantixSidebarWidget] Content container not found");
+      return;
+    }
+
+    // Create folder tree renderer
+    this.folderTreeRenderer = new FolderTreeRenderer({
+      foldersManager: this.favoritesManager.getFoldersManager(),
+      favoritesManager: this.favoritesManager,
+      document: this.documentRef,
+      window: this.windowRef,
+      onFavoriteClick: this.handleFavoriteClick,
+      onFavoriteRemove: this.handleFavoriteRemove,
+      getCurrentConversationId: () => this.getCurrentConversationId(),
+      escapeHtml: (str) => this.escapeHtml(str),
+    });
+
+    this.folderTreeRenderer.init(contentContainer);
   }
 
   /**
@@ -632,66 +705,19 @@ export class SemantixSidebarWidget {
             ${ICONS.star}
             <span>Favorites</span>
             <span class="semantix-sidebar-badge semantix-favorites-badge" style="${favoritesCount > 0 ? "" : "display:none"}">${favoritesCount}</span>
+            <button class="semantix-add-folder-btn" data-action="create-folder" title="Create new folder">
+              ${ICONS.folderPlus}
+            </button>
           </div>
-          <div class="semantix-favorites-list">
-            ${this.createFavoritesListHTML()}
+          <div class="semantix-favorites-content">
+            <!-- Folder tree will be rendered here by FolderTreeRenderer -->
+            <div class="semantix-favorites-loading">Loading...</div>
           </div>
         </div>
       </div>
     `;
 
     return section;
-  }
-
-  /**
-   * Create HTML for the favorites list
-   * @returns {string}
-   */
-  createFavoritesListHTML() {
-    const currentConversationId = this.getCurrentConversationId();
-
-    if (this.favorites.length === 0) {
-      return `
-        <div class="semantix-favorites-empty">
-          No favorites yet. Click ⭐ on a chat to add it!
-        </div>
-      `;
-    }
-
-    return this.favorites
-      .map((fav) => {
-        const isActive = fav.conversationId === currentConversationId;
-        return `
-        <a href="${fav.url || `/c/${fav.conversationId}`}"
-           class="semantix-favorite-item ${isActive ? "active" : ""}"
-           data-conversation-id="${fav.conversationId}"
-           title="${fav.title}">
-          <span class="semantix-favorite-star">${EXTRA_ICONS.starSmall}</span>
-          <span class="semantix-favorite-title">${this.escapeHtml(fav.title)}</span>
-          <span class="semantix-favorite-remove" data-remove-id="${fav.conversationId}" title="Remove from favorites">
-            ${EXTRA_ICONS.x}
-          </span>
-        </a>
-      `;
-      })
-      .join("");
-  }
-
-  /**
-   * Create HTML for menu items (keeping for future use)
-   * @returns {string}
-   */
-  createMenuItemsHTML() {
-    return MENU_ITEMS.map(
-      (item) => `
-      <div class="${CLASSES.MENU_ITEM}" data-action="${item.action}" data-item-id="${item.id}">
-        <div class="${CLASSES.MENU_ICON}">
-          ${ICONS[item.icon] || ""}
-        </div>
-        <span class="${CLASSES.MENU_LABEL}">${item.label}</span>
-      </div>
-    `,
-    ).join("");
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -704,53 +730,61 @@ export class SemantixSidebarWidget {
   bindEvents() {
     if (!this.sectionElement) return;
 
-    // Header click (toggle)
+    // Header click (expand/collapse)
     const header = this.sectionElement.querySelector(`.${CLASSES.HEADER}`);
     if (header) {
+      header.removeEventListener("click", this.handleHeaderClick);
       header.addEventListener("click", this.handleHeaderClick);
     }
 
-    // Menu item clicks
+    // Menu items
     const menuItems = this.sectionElement.querySelectorAll(
       `.${CLASSES.MENU_ITEM}`,
     );
     menuItems.forEach((item) => {
+      item.removeEventListener("click", this.handleMenuItemClick);
       item.addEventListener("click", this.handleMenuItemClick);
     });
 
-    // Favorite item clicks
-    this.bindFavoriteClickEvents();
-    this.bindFavoriteRemoveEvents();
+    // Add folder button in favorites header
+    const addFolderBtn = this.sectionElement.querySelector(
+      ".semantix-add-folder-btn",
+    );
+    if (addFolderBtn) {
+      addFolderBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.folderTreeRenderer) {
+          await this.handleCreateFolder();
+        }
+      });
+    }
   }
 
   /**
-   * Bind click events to favorite items
+   * Handle create folder from header button
    */
-  bindFavoriteClickEvents() {
-    if (!this.sectionElement) return;
+  async handleCreateFolder() {
+    const foldersManager = this.favoritesManager.getFoldersManager();
 
-    const favoriteItems = this.sectionElement.querySelectorAll(
-      ".semantix-favorite-item",
-    );
-    favoriteItems.forEach((item) => {
-      item.addEventListener("click", this.handleFavoriteClick);
+    // Check if can create more root folders
+    const canCreate = await foldersManager.canCreateRootFolder();
+    if (!canCreate) {
+      console.warn("[SemantixSidebarWidget] Max root folders reached");
+      return;
+    }
+
+    // Create folder with default name
+    const folder = await foldersManager.create({
+      name: "New Folder",
+      parentId: null,
     });
-  }
 
-  /**
-   * Bind click events to remove buttons
-   */
-  bindFavoriteRemoveEvents() {
-    if (!this.sectionElement) return;
-
-    const removeButtons = this.sectionElement.querySelectorAll(
-      ".semantix-favorite-remove",
-    );
-    removeButtons.forEach((btn) => {
-      // Remove existing listener first
-      btn.removeEventListener("click", this.handleFavoriteRemove);
-      btn.addEventListener("click", this.handleFavoriteRemove);
-    });
+    if (folder) {
+      // Refresh and start rename
+      await this.updateFavoritesContent();
+      this.folderTreeRenderer.startRename(folder.id);
+    }
   }
 
   /**
@@ -773,40 +807,35 @@ export class SemantixSidebarWidget {
   }
 
   /**
-   * Handle header click (toggle collapsed state)
-   * @param {Event} event
+   * Handle header click (expand/collapse)
+   * @param {Event} e
    */
-  handleHeaderClick(event) {
-    event.preventDefault();
-    event.stopPropagation();
-
+  handleHeaderClick(e) {
+    e.preventDefault();
     this.toggleCollapsed();
   }
 
   /**
    * Handle menu item click
-   * @param {Event} event
+   * @param {Event} e
    */
-  handleMenuItemClick(event) {
-    event.preventDefault();
-    event.stopPropagation();
+  handleMenuItemClick(e) {
+    e.preventDefault();
 
-    const target = event.currentTarget;
+    const target = e.currentTarget;
     const action = target.dataset.action;
     const itemId = target.dataset.itemId;
 
-    console.log(
-      `[SemantixSidebarWidget] Menu item clicked: ${itemId}, action: ${action}`,
-    );
+    console.log(`[SemantixSidebarWidget] Menu item clicked: ${action}`, itemId);
 
-    // Dispatch custom event for external handling
-    const customEvent = new CustomEvent("semantix-sidebar-action", {
+    // Emit custom event for handling by parent
+    const customEvent = new CustomEvent("semantix-menu-action", {
       detail: { action, itemId },
       bubbles: true,
     });
-    this.windowRef.dispatchEvent(customEvent);
+    this.sectionElement.dispatchEvent(customEvent);
 
-    // Also send via postMessage for content script communication
+    // Also handle internally if needed
     this.windowRef.postMessage(
       {
         source: "semantix-sidebar",
@@ -819,38 +848,35 @@ export class SemantixSidebarWidget {
   }
 
   /**
-   * Handle favorite item click (navigate)
-   * @param {Event} event
+   * Handle favorite item click
+   * @param {Event} e
    */
-  handleFavoriteClick(event) {
-    // Don't prevent default - let the link navigate
-    // But stop propagation to parent handlers
-    event.stopPropagation();
-
-    const target = event.currentTarget;
+  handleFavoriteClick(e) {
+    // Allow default navigation to happen
+    // Just log for now
+    const target = e.currentTarget;
     const conversationId = target.dataset.conversationId;
-
-    console.log(`[SemantixSidebarWidget] Favorite clicked: ${conversationId}`);
+    console.log(`[SemantixSidebarWidget] Favorite clicked:`, conversationId);
   }
 
   /**
    * Handle favorite remove button click
-   * @param {Event} event
+   * @param {Event} e
    */
-  async handleFavoriteRemove(event) {
-    event.preventDefault();
-    event.stopPropagation();
+  async handleFavoriteRemove(e) {
+    e.preventDefault();
+    e.stopPropagation();
 
-    const target = event.currentTarget;
+    const target = e.currentTarget;
     const conversationId = target.dataset.removeId;
 
     if (!conversationId) return;
 
-    console.log(`[SemantixSidebarWidget] Removing favorite: ${conversationId}`);
+    console.log(`[SemantixSidebarWidget] Removing favorite:`, conversationId);
 
     try {
       await this.favoritesManager.remove(conversationId);
-      // List will update via the change listener
+      // Change event will trigger refresh
     } catch (error) {
       console.error(
         "[SemantixSidebarWidget] Failed to remove favorite:",
@@ -860,7 +886,7 @@ export class SemantixSidebarWidget {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // STATE MANAGEMENT
+  // COLLAPSE STATE
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -870,8 +896,6 @@ export class SemantixSidebarWidget {
     this.isCollapsed = !this.isCollapsed;
     this.updateCollapsedUI();
     this.saveCollapsedState();
-
-    console.log(`[SemantixSidebarWidget] Collapsed: ${this.isCollapsed}`);
   }
 
   /**
@@ -900,13 +924,10 @@ export class SemantixSidebarWidget {
       } else {
         this.isCollapsed = CONFIG.DEFAULT_COLLAPSED;
       }
-      console.log(
-        `[SemantixSidebarWidget] Loaded collapsed state: ${this.isCollapsed}`,
-      );
-    } catch (e) {
+    } catch (error) {
       console.warn(
         "[SemantixSidebarWidget] Failed to load collapsed state:",
-        e,
+        error,
       );
       this.isCollapsed = CONFIG.DEFAULT_COLLAPSED;
     }
@@ -917,11 +938,14 @@ export class SemantixSidebarWidget {
    */
   saveCollapsedState() {
     try {
-      localStorage.setItem(CONFIG.STORAGE_KEY, String(this.isCollapsed));
-    } catch (e) {
+      localStorage.setItem(
+        CONFIG.STORAGE_KEY,
+        this.isCollapsed ? "true" : "false",
+      );
+    } catch (error) {
       console.warn(
         "[SemantixSidebarWidget] Failed to save collapsed state:",
-        e,
+        error,
       );
     }
   }
@@ -931,17 +955,18 @@ export class SemantixSidebarWidget {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Set up mutation observer to handle dynamic DOM changes
+   * Set up mutation observer to handle dynamic sidebar changes
    */
   setupObserver() {
     if (this.observer) {
       this.observer.disconnect();
     }
 
+    // Debounce timer
     let debounceTimer = null;
 
     this.observer = new MutationObserver((mutations) => {
-      // Debounce to avoid excessive processing
+      // Debounce the handling
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
@@ -951,47 +976,43 @@ export class SemantixSidebarWidget {
       }, CONFIG.DEBOUNCE_DELAY);
     });
 
-    // Observe the body for sidebar changes
+    // Observe the body for changes
     this.observer.observe(this.documentRef.body, {
       childList: true,
       subtree: true,
     });
 
-    console.log("[SemantixSidebarWidget] Mutation observer set up");
+    console.log("[SemantixSidebarWidget] Observer set up");
   }
 
   /**
-   * Handle mutations (re-inject if needed)
+   * Handle mutations from the observer
    * @param {MutationRecord[]} mutations
    */
   handleMutations(mutations) {
-    // Check if our section still exists
-    if (
-      this.sectionElement &&
-      !this.documentRef.body.contains(this.sectionElement)
-    ) {
-      console.log("[SemantixSidebarWidget] Section removed, re-injecting...");
-      this.isInjected = false;
-      this.sectionElement = null;
-      this.retryCount = 0;
+    // Check if our section was removed
+    if (this.isInjected && this.sectionElement) {
+      if (!this.documentRef.contains(this.sectionElement)) {
+        console.log(
+          "[SemantixSidebarWidget] Section was removed, re-injecting...",
+        );
+        this.isInjected = false;
+        this.sectionElement = null;
+        this.tryInject();
+        return;
+      }
+    }
+
+    // Check if we need to inject (if not already)
+    if (!this.isInjected) {
       this.tryInject();
       return;
     }
 
-    // If not injected, try to inject
-    if (!this.isInjected) {
-      this.tryInject();
-    }
-
-    // Check if URL changed (conversation switch) and update active state
+    // Update active state based on URL change
     const currentId = this.getCurrentConversationId();
-    const activeItem = this.sectionElement?.querySelector(
-      ".semantix-favorite-item.active",
-    );
-    const activeId = activeItem?.dataset?.conversationId;
-
-    if (currentId !== activeId) {
-      this.updateFavoritesList();
+    if (this.folderTreeRenderer) {
+      this.folderTreeRenderer.updateActiveState(currentId);
     }
   }
 }
@@ -1001,7 +1022,7 @@ export class SemantixSidebarWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Create and initialize a SemantixSidebarWidget instance
+ * Create and initialize a new SemantixSidebarWidget
  * @param {Object} options
  * @returns {SemantixSidebarWidget}
  */
